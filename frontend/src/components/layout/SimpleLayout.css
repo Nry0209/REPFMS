@@ -1,0 +1,47 @@
+/* For SimpleHeader & SimpleFooter */
+
+.bg-dark-brown {
+  background-color: #0d3b66 !important;
+}
+
+.navbar-brand {
+  background-color: #f8f9fa;
+  padding: 12px 25px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.navbar-brand img {
+  border-radius: 8px;
+}
+
+.system-name {
+  font-size: 1.4rem;
+  font-weight: bold;
+  line-height: 1.1;
+  color: #000;
+}
+
+.ministry-name {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #555;
+}
+
+footer {
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.footer-link {
+  color: #ffffff;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.footer-link:hover {
+  color: #bbbbbb;
+  text-decoration: underline;
+}

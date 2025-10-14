@@ -1,0 +1,30 @@
+footer {
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+footer h4 {
+  font-size: 1.2rem;
+}
+
+.footer-link {
+  color: #ffffff;
+  text-decoration: none;
+  transition: color 0.3s ease, text-decoration 0.3s ease;
+}
+
+.footer-link:hover {
+  color: #bbbbbb;
+  text-decoration: underline;
+}
+
+.footer-icon {
+  color: #ffffff;
+  margin-right: 15px;
+  font-size: 1rem;
+  transition: color 0.3s ease;
+}
+
+.footer-icon:hover {
+  color: #bbbbbb;
+}
