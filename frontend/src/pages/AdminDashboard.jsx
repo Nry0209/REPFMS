@@ -28,8 +28,19 @@ import {
   ArrowUp,
   ArrowDown,
   PersonCheck, 
-  Cash
+  Cash,
+  PersonPlus,
+  PersonX,
+  FileText,
+  Clock,
+  FileEarmarkArrowDown as FileExport,
+  ArrowRepeat as RefreshCw
 } from 'react-bootstrap-icons';
+import SupervisorApprovals from './admin/SupervisorApprovals';
+import ResearchProposals from './admin/ResearchProposals';
+import FundingReview from './admin/FundingReview';
+import SupervisionAllocation from './admin/SupervisionAllocation';
+import AnalyticsReports from './admin/AnalyticsReports';
 import { useNavigate } from 'react-router-dom';
 
 const AdminDashboard = ({ auth, setAuth }) => {
@@ -53,7 +64,6 @@ const AdminDashboard = ({ auth, setAuth }) => {
     { id: 'funding', icon: <CurrencyDollar size={20} />, label: 'Funding Review', badge: 12 },
     { id: 'supervision', icon: <People size={20} />, label: 'Supervision Allocation' },
     { id: 'reports', icon: <GraphUp size={20} />, label: 'Analytics & Reports' },
-    { id: 'settings', icon: <Gear size={20} />, label: 'System Settings' },
   ];
 
   // Stats data for Ministry Dashboard
@@ -130,7 +140,7 @@ const AdminDashboard = ({ auth, setAuth }) => {
       user: 'Funding Committee', 
       action: 'approved funding for', 
       details: 'Renewable Energy Project', 
-      amount: '$15,000',
+      amount: 'LKR 15,000',
       time: '1 day ago', 
       type: 'funding',
       status: 'approved',
@@ -277,7 +287,13 @@ const AdminDashboard = ({ auth, setAuth }) => {
           
           <div className="mt-auto pt-3 border-top">
             <Nav.Link 
-              className="text-dark d-flex align-items-center py-3 px-3 rounded-3 hover-bg-light"
+              className="d-flex align-items-center py-3 px-3 rounded-3"
+              style={{
+                color: '#dc3545',
+                ':hover': {
+                  backgroundColor: 'rgba(220, 53, 69, 0.1)'
+                }
+              }}
               onClick={() => {
                 // Handle logout
                 localStorage.removeItem('adminToken');
@@ -555,7 +571,7 @@ const AdminDashboard = ({ auth, setAuth }) => {
                         <span>68% Allocated</span>
                       </div>
                       <ProgressBar now={68} variant="info" style={{ height: '8px', borderRadius: '4px' }} />
-                      <small className="text-muted">$245,000 remaining</small>
+                      <small className="text-muted">LKR 245,000 remaining</small>
                     </div>
                     <div>
                       <div className="d-flex justify-content-between mb-1">
@@ -572,12 +588,17 @@ const AdminDashboard = ({ auth, setAuth }) => {
           </>
         )}
 
-        {/* Other Tabs Content */}
-        {activeTab !== 'dashboard' && (
+        {/* Tab Content */}
+        {activeTab === 'supervisors' && <SupervisorApprovals />}
+        {activeTab === 'proposals' && <ResearchProposals />}
+        {activeTab === 'funding' && <FundingReview />}
+        {activeTab === 'supervision' && <SupervisionAllocation />}
+        {activeTab === 'reports' && <AnalyticsReports />}
+        {activeTab === 'settings' && (
           <Card className="border-0 shadow-sm">
             <Card.Body>
-              <h4>{navItems.find(item => item.id === activeTab)?.label} Content</h4>
-              <p className="text-muted">This is the {activeTab} section. You can add specific content here.</p>
+              <h4>System Settings</h4>
+              <p className="text-muted">System configuration and preferences.</p>
             </Card.Body>
           </Card>
         )}

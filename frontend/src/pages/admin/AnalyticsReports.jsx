@@ -1,19 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Dropdown, Tabs, Tab, Table, Badge, Button, Form } from 'react-bootstrap';
+import { 
+  Card, Row, Col, Dropdown, Tabs, Tab, Table, Badge, Button, Form,
+  Spinner, ProgressBar, ListGroup, ListGroupItem, Alert
+} from 'react-bootstrap';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
-  PieChart, Pie, Cell, LineChart, Line, AreaChart, Area
+  PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Scatter, ScatterChart, ZAxis
 } from 'recharts';
 import { 
   Download, Funnel, BarChart as BarChartIcon, PieChart as PieChartIcon, 
   GraphUp as LineChartIcon, FileText, Calendar, ArrowRepeat as RefreshCw, 
-  FileEarmarkArrowDown as FileExport, People
+  FileEarmarkArrowDown as FileExport, People, Clock, CurrencyDollar, PersonCheck,
+  GraphUp
 } from 'react-bootstrap-icons';
+
+// Create aliases for components to match the JSX
+const Progress = ProgressBar;
+const List = ListGroup;
+const ListItem = ListGroup.Item;
+
+// Make sure GraphUp is available
+const GraphUpIcon = GraphUp;
 
 const AnalyticsReports = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [timeRange, setTimeRange] = useState('last_year');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [reportType, setReportType] = useState('summary');
   
   // Mock data - replace with actual API calls
@@ -21,7 +33,9 @@ const AnalyticsReports = () => {
     fundingTrends: [],
     researchDomains: [],
     supervisorLoad: [],
-    rejectionReasons: []
+    rejectionReasons: [],
+    studentProgress: [],
+    publicationTrends: []
   });
 
   useEffect(() => {
@@ -30,19 +44,22 @@ const AnalyticsReports = () => {
       setLoading(true);
       try {
         // This would be replaced with actual API calls
-        setTimeout(() => {
-          // Mock data based on time range
-          const mockData = {
-            fundingTrends: getFundingTrendsData(timeRange),
-            researchDomains: getResearchDomainsData(timeRange),
-            supervisorLoad: getSupervisorLoadData(timeRange),
-            rejectionReasons: getRejectionReasonsData(timeRange)
-          };
-          setReportData(mockData);
-          setLoading(false);
-        }, 800);
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Mock data based on time range
+        const mockData = {
+          fundingTrends: getFundingTrendsData(timeRange),
+          researchDomains: getResearchDomainsData(),
+          supervisorLoad: getSupervisorLoadData(),
+          rejectionReasons: getRejectionReasonsData(),
+          studentProgress: getStudentProgressData(),
+          publicationTrends: getPublicationTrendsData()
+        };
+        
+        setReportData(mockData);
       } catch (error) {
         console.error('Error fetching analytics data:', error);
+      } finally {
         setLoading(false);
       }
     };
@@ -52,7 +69,6 @@ const AnalyticsReports = () => {
 
   // Mock data generation functions
   const getFundingTrendsData = (range) => {
-    // This would be replaced with actual data from the API
     if (range === 'last_year') {
       return [
         { name: 'Jan', amount: 40000 },
@@ -104,14 +120,38 @@ const AnalyticsReports = () => {
     ];
   };
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+  const getStudentProgressData = () => {
+    return [
+      { name: 'John Smith', progress: 85, months: 12, expected: 36 },
+      { name: 'Emily Chen', progress: 45, months: 8, expected: 24 },
+      { name: 'Michael Brown', progress: 65, months: 24, expected: 48 },
+      { name: 'Sarah Johnson', progress: 30, months: 6, expected: 36 },
+      { name: 'David Kim', progress: 90, months: 30, expected: 36 },
+    ];
+  };
+
+  const getPublicationTrendsData = () => {
+    return [
+      { year: '2019', publications: 12, citations: 45 },
+      { year: '2020', publications: 18, citations: 78 },
+      { year: '2021', publications: 24, citations: 112 },
+      { year: '2022', publications: 32, citations: 198 },
+      { year: '2023', publications: 28, citations: 145 },
+    ];
+  };
+
+  const COLORS = ['#0d6efd', '#198754', '#ffc107', '#0dcaf0', '#6c757d'];
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white p-2 border shadow-sm">
+        <div className="bg-white p-2 border shadow-sm rounded">
           <p className="mb-0 fw-semibold">{label}</p>
-          <p className="mb-0">${payload[0].value.toLocaleString()}</p>
+          {payload.map((entry, index) => (
+            <p key={`tooltip-${index}`} className="mb-0" style={{ color: entry.color }}>
+              {entry.name}: {entry.name === 'amount' ? '$' : ''}{entry.value.toLocaleString()}
+            </p>
+          ))}
         </div>
       );
     }
@@ -120,6 +160,7 @@ const AnalyticsReports = () => {
 
   const renderOverviewTab = () => (
     <Row className="g-4">
+      {/* Funding Trends */}
       <Col xl={8}>
         <Card className="h-100 shadow-sm">
           <Card.Body>
@@ -173,6 +214,7 @@ const AnalyticsReports = () => {
         </Card>
       </Col>
       
+      {/* Research Domains */}
       <Col xl={4}>
         <Card className="h-100 shadow-sm">
           <Card.Body>
@@ -207,15 +249,18 @@ const AnalyticsReports = () => {
           </Card.Body>
         </Card>
       </Col>
-      
+
+      {/* Supervisor Load */}
       <Col xl={6}>
         <Card className="h-100 shadow-sm">
           <Card.Body>
             <div className="d-flex justify-content-between align-items-center mb-4">
-              <h5 className="mb-0">Supervisor Load</h5>
-              <Button variant="outline-secondary" size="sm">
-                <Download />
-              </Button>
+              <h5 className="mb-0">Supervisor Workload</h5>
+              <div className="d-flex gap-2">
+                <Button variant="outline-secondary" size="sm">
+                  <Download />
+                </Button>
+              </div>
             </div>
             <div style={{ height: '300px' }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -224,23 +269,16 @@ const AnalyticsReports = () => {
                   layout="vertical"
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" domain={[0, 100]} />
-                  <YAxis dataKey="name" type="category" width={120} />
-                  <Tooltip 
-                    formatter={(value, name, props) => {
-                      if (name === 'utilization') {
-                        return [`${value}%`, 'Utilization'];
-                      }
-                      return [value, name === 'current' ? 'Current' : 'Max'];
-                    }}
-                  />
-                  <Bar dataKey="current" name="Current" fill="#0d6efd" radius={[0, 4, 4, 0]}
-                    label={{ position: 'insideRight', fill: 'white' }}>
+                  <YAxis dataKey="name" type="category" width={100} />
+                  <Tooltip formatter={(value) => [`${value}%`, 'Utilization']} />
+                  <Legend />
+                  <Bar dataKey="utilization" name="Utilization" fill="#0d6efd" radius={[0, 4, 4, 0]}>
                     {reportData.supervisorLoad.map((entry, index) => (
                       <Cell 
                         key={`cell-${index}`} 
-                        fill={entry.utilization >= 90 ? '#dc3545' : entry.utilization >= 75 ? '#ffc107' : '#198754'} 
+                        fill={entry.utilization > 80 ? '#dc3545' : entry.utilization > 60 ? '#ffc107' : '#198754'} 
                       />
                     ))}
                   </Bar>
@@ -250,176 +288,424 @@ const AnalyticsReports = () => {
           </Card.Body>
         </Card>
       </Col>
-      
+
+      {/* Student Progress */}
       <Col xl={6}>
         <Card className="h-100 shadow-sm">
           <Card.Body>
             <div className="d-flex justify-content-between align-items-center mb-4">
-              <h5 className="mb-0">Rejection Reasons</h5>
-              <Button variant="outline-secondary" size="sm">
-                <Download />
-              </Button>
+              <h5 className="mb-0">Student Progress</h5>
+              <div className="d-flex gap-2">
+                <Button variant="outline-secondary" size="sm">
+                  <Download />
+                </Button>
+              </div>
             </div>
-            <Table hover className="mb-0">
-              <thead>
-                <tr>
-                  <th>Reason</th>
-                  <th className="text-end">Count</th>
-                  <th className="text-end">Percentage</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reportData.rejectionReasons.map((item, index) => {
-                  const total = reportData.rejectionReasons.reduce((sum, curr) => sum + curr.count, 0);
-                  const percentage = ((item.count / total) * 100).toFixed(1);
-                  
-                  return (
-                    <tr key={index}>
-                      <td>{item.reason}</td>
-                      <td className="text-end">{item.count}</td>
-                      <td>
-                        <div className="d-flex align-items-center justify-content-end">
-                          <span className="me-2">{percentage}%</span>
-                          <div style={{ width: '100px' }}>
-                            <div 
-                              className="bg-primary rounded" 
-                              style={{ 
-                                width: `${percentage}%`, 
-                                height: '8px',
-                                backgroundColor: COLORS[index % COLORS.length] 
-                              }} 
-                            />
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
+            <div style={{ height: '300px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart
+                  margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    type="number" 
+                    dataKey="months" 
+                    name="Months Enrolled" 
+                    unit="mos"
+                    domain={[0, 60]}
+                  />
+                  <YAxis 
+                    type="number" 
+                    dataKey="progress" 
+                    name="Progress" 
+                    unit="%"
+                    domain={[0, 100]}
+                  />
+                  <ZAxis dataKey="expected" name="Expected Duration" range={[60, 400]} />
+                  <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip />} />
+                  <Legend />
+                  <Scatter name="Students" data={reportData.studentProgress} fill="#0d6efd">
+                    {reportData.studentProgress.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={entry.progress > 80 ? '#198754' : entry.progress > 50 ? '#ffc107' : '#dc3545'} 
+                      />
+                    ))}
+                  </Scatter>
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
           </Card.Body>
         </Card>
       </Col>
     </Row>
   );
 
-  const renderReportsTab = () => (
-    <Card className="shadow-sm">
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h5 className="mb-0">Generate Reports</h5>
-          <div className="d-flex gap-2">
-            <Button variant="outline-primary" size="sm">
-              <RefreshCw size={16} className="me-1" /> Refresh Data
-            </Button>
-          </div>
-        </div>
-        
-        <Row className="g-4">
-          <Col md={6} lg={4}>
-            <Card className="h-100 border">
-              <Card.Body className="text-center">
-                <div className="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '64px', height: '64px' }}>
-                  <BarChartIcon size={32} className="text-primary" />
+  const renderResearchTab = () => (
+    <Row className="g-4">
+      <Col xl={8}>
+        <Card className="h-100 shadow-sm">
+          <Card.Body>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <h5 className="mb-0">Publication Trends</h5>
+              <div className="d-flex gap-2">
+                <Form.Select size="sm" style={{ width: '150px' }}>
+                  <option>Last 5 Years</option>
+                  <option>Last 10 Years</option>
+                  <option>All Time</option>
+                </Form.Select>
+                <Button variant="outline-secondary" size="sm">
+                  <Download />
+                </Button>
+              </div>
+            </div>
+            <div style={{ height: '400px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={reportData.publicationTrends}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="year" />
+                  <YAxis yAxisId="left" orientation="left" stroke="#0d6efd" />
+                  <YAxis yAxisId="right" orientation="right" stroke="#198754" />
+                  <Tooltip />
+                  <Legend />
+                  <Line yAxisId="left" type="monotone" dataKey="publications" name="Publications" stroke="#0d6efd" activeDot={{ r: 8 }} />
+                  <Line yAxisId="right" type="monotone" dataKey="citations" name="Citations" stroke="#198754" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </Card.Body>
+        </Card>
+      </Col>
+      
+      <Col xl={4}>
+        <Card className="h-100 shadow-sm">
+          <Card.Body>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <h5 className="mb-0">Research Impact</h5>
+              <Button variant="outline-secondary" size="sm">
+                <Download />
+              </Button>
+            </div>
+            <div className="text-center mb-4">
+              <div className="display-4 fw-bold text-primary">
+                1,245
+              </div>
+              <div className="text-muted">Total Citations</div>
+            </div>
+            <div className="row text-center">
+              <div className="col-4">
+                <div className="h4 mb-1">24</div>
+                <div className="small text-muted">h-index</div>
+              </div>
+              <div className="col-4">
+                <div className="h4 mb-1">1.8</div>
+                <div className="small text-muted">Citations/Paper</div>
+              </div>
+              <div className="col-4">
+                <div className="h4 mb-1">87%</div>
+                <div className="small text-muted">Collaboration Rate</div>
+              </div>
+            </div>
+            
+            <div className="mt-4">
+              <h6>Top Research Areas</h6>
+              {reportData.researchDomains.map((domain, index) => (
+                <div key={index} className="mb-2">
+                  <div className="d-flex justify-content-between mb-1">
+                    <span>{domain.name}</span>
+                    <span className="fw-semibold">{domain.value}%</span>
+                  </div>
+                  <ProgressBar 
+                    now={domain.value} 
+                    variant={index % 2 === 0 ? 'primary' : 'success'} 
+                    style={{ height: '6px' }} 
+                  />
                 </div>
-                <h5>Funding Report</h5>
-                <p className="text-muted mb-4">Detailed breakdown of funding allocations, expenditures, and trends.</p>
-                <div className="d-grid gap-2">
-                  <Button variant="outline-primary">
-                    <Download className="me-2" /> Generate Report
-                  </Button>
+              ))}
+            </div>
+          </Card.Body>
+        </Card>
+      </Col>
+    </Row>
+  );
+
+  const renderFinancialTab = () => (
+    <Row className="g-4">
+      <Col xl={8}>
+        <Card className="h-100 shadow-sm">
+          <Card.Body>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <h5 className="mb-0">Budget Allocation</h5>
+              <div className="d-flex gap-2">
+                <Form.Select size="sm" style={{ width: '150px' }}>
+                  <option>Current Year</option>
+                  <option>Last Year</option>
+                  <option>Last 5 Years</option>
+                </Form.Select>
+                <Button variant="outline-secondary" size="sm">
+                  <Download />
+                </Button>
+              </div>
+            </div>
+            <div style={{ height: '400px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={[
+                    { name: 'Personnel', allocated: 650000, used: 520000 },
+                    { name: 'Equipment', allocated: 200000, used: 185000 },
+                    { name: 'Travel', allocated: 80000, used: 45000 },
+                    { name: 'Materials', allocated: 50000, used: 32000 },
+                    { name: 'Other', allocated: 20000, used: 12000 },
+                  ]}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="allocated" name="Allocated" fill="#0d6efd" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="used" name="Used" fill="#198754" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card.Body>
+        </Card>
+      </Col>
+      
+      <Col xl={4}>
+        <Card className="h-100 shadow-sm">
+          <Card.Body>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <h5 className="mb-0">Financial Summary</h5>
+              <Button variant="outline-secondary" size="sm">
+                <Download />
+              </Button>
+            </div>
+            
+            <div className="mb-4">
+              <div className="d-flex justify-content-between mb-2">
+                <span>Total Budget</span>
+                <span className="fw-semibold">$1,000,000</span>
+              </div>
+              <div className="d-flex justify-content-between mb-2">
+                <span>Allocated</span>
+                <span className="fw-semibold">$794,000</span>
+              </div>
+              <div className="d-flex justify-content-between mb-2">
+                <span>Remaining</span>
+                <span className="fw-semibold text-success">$206,000</span>
+              </div>
+              <ProgressBar 
+                now={79.4} 
+                variant={79.4 > 80 ? 'danger' : 'success'} 
+                className="mt-2" 
+                style={{ height: '8px' }} 
+                label={`${79.4}%`}
+              />
+            </div>
+            
+            <h6 className="mb-3">Top Funded Projects</h6>
+            <ListGroup variant="flush" className="mb-3">
+              <ListGroup.Item className="d-flex justify-content-between align-items-center">
+                <div className="me-3">
+                  <div className="fw-semibold">AI in Healthcare</div>
+                  <small className="text-muted">Dr. Emily Chen</small>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          
-          <Col md={6} lg={4}>
-            <Card className="h-100 border">
-              <Card.Body className="text-center">
-                <div className="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '64px', height: '64px' }}>
-                  <PieChartIcon size={32} className="text-success" />
+                <span className="badge bg-primary rounded-pill">$250,000</span>
+              </ListGroup.Item>
+              <ListGroup.Item className="d-flex justify-content-between align-items-center">
+                <div className="me-3">
+                  <div className="fw-semibold">Quantum Computing</div>
+                  <small className="text-muted">Dr. Robert Johnson</small>
                 </div>
-                <h5>Research Domain Analysis</h5>
-                <p className="text-muted mb-4">Analysis of research areas, trends, and publication metrics.</p>
-                <div className="d-grid gap-2">
-                  <Button variant="outline-success">
-                    <Download className="me-2" /> Generate Report
-                  </Button>
+                <span className="badge bg-primary rounded-pill">$180,000</span>
+              </ListGroup.Item>
+              <ListGroup.Item className="d-flex justify-content-between align-items-center">
+                <div className="me-3">
+                  <div className="fw-semibold">Cybersecurity</div>
+                  <small className="text-muted">Dr. Sarah Williams</small>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          
-          <Col md={6} lg={4}>
-            <Card className="h-100 border">
-              <Card.Body className="text-center">
-                <div className="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '64px', height: '64px' }}>
-                  <People size={32} className="text-info" />
+                <span className="badge bg-primary rounded-pill">$150,000</span>
+              </ListGroup.Item>
+            </ListGroup>
+            
+            <div className="mt-4">
+              <h6>Funding Sources</h6>
+              <div className="mt-3">
+                <div className="d-flex justify-content-between mb-2">
+                  <span>Government Grants</span>
+                  <span className="fw-semibold">45%</span>
                 </div>
-                <h5>Supervisor Performance</h5>
-                <p className="text-muted mb-4">Evaluation of supervisor workload, student progress, and outcomes.</p>
-                <div className="d-grid gap-2">
-                  <Button variant="outline-info">
-                    <Download className="me-2" /> Generate Report
-                  </Button>
+                <div className="d-flex justify-content-between mb-2">
+                  <span>Industry Partners</span>
+                  <span className="fw-semibold">30%</span>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          
-          <Col md={6} lg={4}>
-            <Card className="h-100 border">
-              <Card.Body className="text-center">
-                <div className="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '64px', height: '64px' }}>
-                  <FileText size={32} className="text-warning" />
+                <div className="d-flex justify-content-between mb-2">
+                  <span>University Funds</span>
+                  <span className="fw-semibold">15%</span>
                 </div>
-                <h5>Proposal Status Report</h5>
-                <p className="text-muted mb-4">Status tracking and analysis of research proposals.</p>
-                <div className="d-grid gap-2">
-                  <Button variant="outline-warning">
-                    <Download className="me-2" /> Generate Report
-                  </Button>
+                <div className="d-flex justify-content-between">
+                  <span>Other</span>
+                  <span className="fw-semibold">10%</span>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          
-          <Col md={6} lg={4}>
-            <Card className="h-100 border">
-              <Card.Body className="text-center">
-                <div className="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '64px', height: '64px' }}>
-                  <Calendar size={32} className="text-danger" />
+              </div>
+            </div>
+          </Card.Body>
+        </Card>
+      </Col>
+    </Row>
+  );
+
+  const renderStudentTab = () => (
+    <Row className="g-4">
+      <Col xl={8}>
+        <Card className="h-100 shadow-sm">
+          <Card.Body>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <h5 className="mb-0">Student Progress</h5>
+              <div className="d-flex gap-2">
+                <Form.Select size="sm" style={{ width: '150px' }}>
+                  <option>All Programs</option>
+                  <option>PhD</option>
+                  <option>MSc</option>
+                </Form.Select>
+                <Button variant="outline-secondary" size="sm">
+                  <Download />
+                </Button>
+              </div>
+            </div>
+            <div style={{ height: '400px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart
+                  margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    type="number" 
+                    dataKey="months" 
+                    name="Months Enrolled" 
+                    unit="mos"
+                    domain={[0, 60]}
+                  />
+                  <YAxis 
+                    type="number" 
+                    dataKey="progress" 
+                    name="Progress" 
+                    unit="%"
+                    domain={[0, 100]}
+                  />
+                  <ZAxis dataKey="expected" name="Expected Duration" range={[60, 400]} />
+                  <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip />} />
+                  <Legend />
+                  <Scatter name="Students" data={reportData.studentProgress} fill="#0d6efd">
+                    {reportData.studentProgress.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={entry.progress > 80 ? '#198754' : entry.progress > 50 ? '#ffc107' : '#dc3545'} 
+                      />
+                    ))}
+                  </Scatter>
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
+          </Card.Body>
+        </Card>
+      </Col>
+      
+      <Col xl={4}>
+        <Card className="h-100 shadow-sm">
+          <Card.Body>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <h5 className="mb-0">Student Statistics</h5>
+              <Button variant="outline-secondary" size="sm">
+                <Download />
+              </Button>
+            </div>
+            
+            <div className="row text-center mb-4">
+              <div className="col-6 mb-3">
+                <div className="p-3 bg-light rounded">
+                  <div className="h2 mb-1">124</div>
+                  <div className="text-muted small">Total Students</div>
                 </div>
-                <h5>Annual Performance</h5>
-                <p className="text-muted mb-4">Comprehensive annual performance and activity report.</p>
-                <div className="d-grid gap-2">
-                  <Button variant="outline-danger">
-                    <Download className="me-2" /> Generate Report
-                  </Button>
+              </div>
+              <div className="col-6 mb-3">
+                <div className="p-3 bg-light rounded">
+                  <div className="h2 mb-1">24</div>
+                  <div className="text-muted small">New This Year</div>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          
-          <Col md={6} lg={4}>
-            <Card className="h-100 border">
-              <Card.Body className="text-center">
-                <div className="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '64px', height: '64px' }}>
-                  <FileExport size={32} className="text-secondary" />
+              </div>
+              <div className="col-6">
+                <div className="p-3 bg-light rounded">
+                  <div className="h2 mb-1">3.8</div>
+                  <div className="text-muted small">Avg. GPA</div>
                 </div>
-                <h5>Custom Report</h5>
-                <p className="text-muted mb-4">Create a custom report with your specific criteria.</p>
-                <div className="d-grid gap-2">
-                  <Button variant="outline-secondary">
-                    <Download className="me-2" /> Create Custom Report
-                  </Button>
+              </div>
+              <div className="col-6">
+                <div className="p-3 bg-light rounded">
+                  <div className="h2 mb-1">92%</div>
+                  <div className="text-muted small">Retention Rate</div>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Card.Body>
-    </Card>
+              </div>
+            </div>
+            
+            <div className="mb-4">
+              <h6>Program Distribution</h6>
+              <div style={{ height: '200px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'PhD', value: 45 },
+                        { name: 'MSc', value: 55 },
+                        { name: 'MPhil', value: 24 }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={70}
+                      fill="#8884d8"
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      <Cell fill="#0d6efd" />
+                      <Cell fill="#198754" />
+                      <Cell fill="#ffc107" />
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            
+            <div>
+              <h6>Upcoming Milestones</h6>
+              <ListGroup variant="flush">
+                <ListGroup.Item className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <div className="fw-semibold">Thesis Defense</div>
+                    <small className="text-muted">John Smith - May 15, 2023</small>
+                  </div>
+                  <Badge bg="primary">PhD</Badge>
+                </ListGroup.Item>
+                <ListGroup.Item className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <div className="fw-semibold">Proposal Defense</div>
+                    <small className="text-muted">Emily Chen - June 2, 2023</small>
+                  </div>
+                  <Badge bg="success">MSc</Badge>
+                </ListGroup.Item>
+              </ListGroup>
+            </div>
+          </Card.Body>
+        </Card>
+      </Col>
+    </Row>
   );
 
   return (
@@ -427,14 +713,16 @@ const AnalyticsReports = () => {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="mb-0">Analytics & Reports</h2>
-          <p className="text-muted mb-0">Gain insights and generate detailed reports</p>
+          <p className="text-muted mb-0">Comprehensive insights and analytics</p>
         </div>
-        <div>
-          <Button variant="outline-primary" className="me-2">
-            <Download className="me-2" /> Export Data
+        <div className="d-flex gap-2">
+          <Button variant="outline-primary">
+            <FileExport className="me-2" />
+            Export Report
           </Button>
           <Button variant="primary">
-            <FileText className="me-2" /> Create Custom Report
+            <RefreshCw className="me-2" />
+            Refresh Data
           </Button>
         </div>
       </div>
@@ -443,42 +731,33 @@ const AnalyticsReports = () => {
         activeKey={activeTab}
         onSelect={(k) => setActiveTab(k)}
         className="mb-4"
+        id="analytics-tabs"
       >
-        <Tab eventKey="overview" title="Overview" />
-        <Tab eventKey="reports" title="Reports" />
-        <Tab eventKey="custom" title="Custom Analytics" />
+        <Tab eventKey="overview" title={
+          <span><GraphUp className="me-1" /> Overview</span>
+        } />
+        <Tab eventKey="research" title={
+          <span><FileText className="me-1" /> Research Analytics</span>
+        } />
+        <Tab eventKey="financial" title={
+          <span><CurrencyDollar className="me-1" /> Financial Reports</span>
+        } />
+        <Tab eventKey="students" title={
+          <span><People className="me-1" /> Student Analytics</span>
+        } />
       </Tabs>
 
       {loading ? (
-        <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
-          <div className="text-center">
-            <div className="spinner-border text-primary mb-3" role="status">
-              <span className="visually-hidden">Loading...</span>
-            </div>
-            <p>Loading analytics data...</p>
-          </div>
+        <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
+          <Spinner animation="border" variant="primary" />
         </div>
       ) : (
-        <div>
+        <>
           {activeTab === 'overview' && renderOverviewTab()}
-          {activeTab === 'reports' && renderReportsTab()}
-          {activeTab === 'custom' && (
-            <Card className="shadow-sm">
-              <Card.Body className="text-center py-5">
-                <div className="py-5">
-                  <BarChartIcon size={48} className="text-muted mb-3" />
-                  <h4>Custom Analytics</h4>
-                  <p className="text-muted mb-4">
-                    Create custom analytics dashboards and queries based on your specific needs.
-                  </p>
-                  <Button variant="primary">
-                    Create Custom Dashboard
-                  </Button>
-                </div>
-              </Card.Body>
-            </Card>
-          )}
-        </div>
+          {activeTab === 'research' && renderResearchTab()}
+          {activeTab === 'financial' && renderFinancialTab()}
+          {activeTab === 'students' && renderStudentTab()}
+        </>
       )}
     </div>
   );

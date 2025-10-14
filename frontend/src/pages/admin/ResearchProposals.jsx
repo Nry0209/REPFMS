@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Badge, Button, Form, Modal, Spinner, Tabs, Tab } from 'react-bootstrap';
-import { Search, Filter, FileText, CheckCircle, XCircle, Clock, User, Download } from 'react-bootstrap-icons';
+import { Card, Table, Button, Badge, Form, Modal, Spinner, Alert, Tabs, Tab } from 'react-bootstrap';
+import { Search, Filter, FileText, CheckCircle, XCircle, Clock, Download, Eye } from 'react-bootstrap-icons';
 
 const ResearchProposals = () => {
   const [proposals, setProposals] = useState([]);
@@ -11,11 +11,13 @@ const ResearchProposals = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [feedback, setFeedback] = useState('');
 
+  // Mock data - replace with actual API call
   useEffect(() => {
-    // Simulate API call
     const fetchProposals = async () => {
       try {
-        // Replace with actual API call
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         const mockData = [
           {
             id: 1,
@@ -28,10 +30,23 @@ const ResearchProposals = () => {
             documents: ['proposal.pdf', 'budget.xlsx'],
             fundingRequested: 15000,
             duration: '12 months',
-            summary: 'This research aims to develop AI models for early detection of chronic diseases using medical imaging.'
+            summary: 'This research aims to develop AI models for early detection of chronic diseases using medical imaging.',
+            objectives: [
+              'Develop deep learning models for disease detection',
+              'Improve accuracy of early diagnosis',
+              'Create a scalable solution for healthcare providers'
+            ],
+            budgetBreakdown: {
+              personnel: 8000,
+              equipment: 3000,
+              materials: 2000,
+              travel: 1000,
+              other: 1000
+            }
           },
-          // Add more mock data as needed
+          // Add more mock data
         ];
+        
         setProposals(mockData);
       } catch (error) {
         console.error('Error fetching proposals:', error);
@@ -44,9 +59,9 @@ const ResearchProposals = () => {
   }, []);
 
   const handleStatusChange = (id, status) => {
-    // Handle status change logic
-    console.log(`Changed status of proposal ${id} to ${status}`);
-    // Update UI or make API call
+    setProposals(proposals.map(proposal => 
+      proposal.id === id ? { ...proposal, status } : proposal
+    ));
   };
 
   const handleViewDetails = (proposal) => {
@@ -55,8 +70,19 @@ const ResearchProposals = () => {
   };
 
   const handleSubmitReview = () => {
-    // Handle review submission
-    console.log('Review submitted:', { proposalId: selectedProposal.id, feedback });
+    if (!feedback.trim()) return;
+    
+    // Update the proposal with feedback
+    setProposals(proposals.map(proposal => 
+      proposal.id === selectedProposal.id 
+        ? { 
+            ...proposal, 
+            status: 'revision',
+            feedback 
+          } 
+        : proposal
+    ));
+    
     setShowDetails(false);
     setFeedback('');
   };
@@ -71,18 +97,17 @@ const ResearchProposals = () => {
     return proposal.status === activeTab && matchesSearch;
   });
 
-  const getStatusVariant = (status) => {
+  const getStatusBadge = (status) => {
     switch (status) {
       case 'approved':
-        return 'success';
+        return <Badge bg="success">Approved</Badge>;
       case 'rejected':
-        return 'danger';
-      case 'pending':
-        return 'warning';
+        return <Badge bg="danger">Rejected</Badge>;
       case 'revision':
-        return 'info';
+        return <Badge bg="info">Needs Revision</Badge>;
+      case 'pending':
       default:
-        return 'secondary';
+        return <Badge bg="warning" text="dark">Pending Review</Badge>;
     }
   };
 
@@ -97,7 +122,10 @@ const ResearchProposals = () => {
   return (
     <div className="container-fluid">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="mb-0">Research Proposals</h2>
+        <div>
+          <h2 className="mb-0">Research Proposals</h2>
+          <p className="text-muted mb-0">Review and manage research proposals</p>
+        </div>
         <div className="d-flex">
           <div className="input-group" style={{ width: '300px' }}>
             <span className="input-group-text bg-white">
@@ -111,10 +139,6 @@ const ResearchProposals = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline-secondary" className="ms-2">
-            <Filter className="me-2" />
-            Filter
-          </Button>
         </div>
       </div>
 
@@ -129,19 +153,25 @@ const ResearchProposals = () => {
             <Tab eventKey="pending" title={
               <>
                 <Clock className="me-1" /> Pending
-                <Badge bg="warning" className="ms-2">3</Badge>
+                <Badge bg="warning" className="ms-2">
+                  {proposals.filter(p => p.status === 'pending').length}
+                </Badge>
               </>
             } />
             <Tab eventKey="approved" title={
               <>
                 <CheckCircle className="me-1" /> Approved
-                <Badge bg="success" className="ms-2">5</Badge>
+                <Badge bg="success" className="ms-2">
+                  {proposals.filter(p => p.status === 'approved').length}
+                </Badge>
               </>
             } />
             <Tab eventKey="revision" title={
               <>
                 <FileText className="me-1" /> Needs Revision
-                <Badge bg="info" className="ms-2">2</Badge>
+                <Badge bg="info" className="ms-2">
+                  {proposals.filter(p => p.status === 'revision').length}
+                </Badge>
               </>
             } />
             <Tab eventKey="rejected" title={
@@ -158,59 +188,63 @@ const ResearchProposals = () => {
                   <th>Title</th>
                   <th>Researcher</th>
                   <th>Department</th>
-                  <th>Supervisor</th>
                   <th>Funding Requested</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredProposals.map((proposal) => (
-                  <tr key={proposal.id}>
-                    <td>
-                      <div className="fw-semibold">{proposal.title}</div>
-                      <small className="text-muted">
-                        Submitted: {new Date(proposal.submissionDate).toLocaleDateString()}
-                      </small>
-                    </td>
-                    <td>{proposal.researcher}</td>
-                    <td>{proposal.department}</td>
-                    <td>{proposal.supervisor}</td>
-                    <td>${proposal.fundingRequested.toLocaleString()}</td>
-                    <td>
-                      <Badge bg={getStatusVariant(proposal.status)} className="text-uppercase">
-                        {proposal.status}
-                      </Badge>
-                    </td>
-                    <td>
-                      <div className="d-flex gap-2">
-                        <Button 
-                          variant="outline-primary" 
-                          size="sm"
-                          onClick={() => handleViewDetails(proposal)}
-                        >
-                          <FileText className="me-1" /> Review
-                        </Button>
-                        <Button 
-                          variant="outline-success" 
-                          size="sm"
-                          onClick={() => handleStatusChange(proposal.id, 'approved')}
-                          disabled={proposal.status === 'approved'}
-                        >
-                          <CheckCircle className="me-1" /> Approve
-                        </Button>
-                        <Button 
-                          variant="outline-danger" 
-                          size="sm"
-                          onClick={() => handleStatusChange(proposal.id, 'rejected')}
-                          disabled={proposal.status === 'rejected'}
-                        >
-                          <XCircle className="me-1" /> Reject
-                        </Button>
-                      </div>
+                {filteredProposals.length > 0 ? (
+                  filteredProposals.map((proposal) => (
+                    <tr key={proposal.id}>
+                      <td>
+                        <div className="fw-semibold">{proposal.title}</div>
+                        <small className="text-muted">
+                          Submitted: {new Date(proposal.submissionDate).toLocaleDateString()}
+                        </small>
+                      </td>
+                      <td>{proposal.researcher}</td>
+                      <td>{proposal.department}</td>
+                      <td>LKR {proposal.fundingRequested.toLocaleString()}</td>
+                      <td>{getStatusBadge(proposal.status)}</td>
+                      <td>
+                        <div className="d-flex gap-2">
+                          <Button 
+                            variant="outline-primary" 
+                            size="sm"
+                            onClick={() => handleViewDetails(proposal)}
+                          >
+                            <Eye className="me-1" /> View
+                          </Button>
+                          {proposal.status === 'pending' && (
+                            <>
+                              <Button 
+                                variant="outline-success" 
+                                size="sm"
+                                onClick={() => handleStatusChange(proposal.id, 'approved')}
+                              >
+                                <CheckCircle className="me-1" /> Approve
+                              </Button>
+                              <Button 
+                                variant="outline-danger" 
+                                size="sm"
+                                onClick={() => handleStatusChange(proposal.id, 'rejected')}
+                              >
+                                <XCircle className="me-1" /> Reject
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" className="text-center py-4">
+                      <div className="text-muted">No proposals found matching your criteria</div>
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </Table>
           </div>
@@ -218,109 +252,88 @@ const ResearchProposals = () => {
       </Card>
 
       {/* Proposal Details Modal */}
-      <Modal show={showDetails} onHide={() => setShowDetails(false)} size="xl">
+      <Modal show={showDetails} onHide={() => setShowDetails(false)} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>Proposal Details</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {selectedProposal && (
-            <div className="row">
-              <div className="col-md-8">
-                <h4>{selectedProposal.title}</h4>
-                <p className="text-muted">{selectedProposal.summary}</p>
-                
-                <h5 className="mt-4">Project Details</h5>
-                <Table bordered className="mb-4">
-                  <tbody>
-                    <tr>
-                      <th style={{ width: '30%' }}>Researcher</th>
-                      <td>{selectedProposal.researcher}</td>
-                    </tr>
-                    <tr>
-                      <th>Department</th>
-                      <td>{selectedProposal.department}</td>
-                    </tr>
-                    <tr>
-                      <th>Supervisor</th>
-                      <td>{selectedProposal.supervisor}</td>
-                    </tr>
-                    <tr>
-                      <th>Funding Requested</th>
-                      <td>${selectedProposal.fundingRequested.toLocaleString()}</td>
-                    </tr>
-                    <tr>
-                      <th>Duration</th>
-                      <td>{selectedProposal.duration}</td>
-                    </tr>
-                    <tr>
-                      <th>Status</th>
-                      <td>
-                        <Badge bg={getStatusVariant(selectedProposal.status)} className="text-uppercase">
-                          {selectedProposal.status}
-                        </Badge>
-                      </td>
-                    </tr>
-                  </tbody>
-                </Table>
+            <div>
+              <h4>{selectedProposal.title}</h4>
+              <div className="mb-4">
+                <p className="mb-1"><strong>Researcher:</strong> {selectedProposal.researcher}</p>
+                <p className="mb-1"><strong>Department:</strong> {selectedProposal.department}</p>
+                <p className="mb-1"><strong>Supervisor:</strong> {selectedProposal.supervisor}</p>
+                <p className="mb-1"><strong>Funding Requested:</strong> LKR {selectedProposal.fundingRequested.toLocaleString()}</p>
+                <p className="mb-1"><strong>Duration:</strong> {selectedProposal.duration}</p>
+                <p className="mb-0"><strong>Status:</strong> {getStatusBadge(selectedProposal.status)}</p>
+              </div>
 
-                <h5>Documents</h5>
-                <div className="d-flex flex-wrap gap-2 mb-4">
-                  {selectedProposal.documents.map((doc, idx) => (
-                    <Button 
-                      key={idx} 
-                      variant="outline-primary" 
-                      size="sm"
-                      className="d-flex align-items-center"
-                    >
-                      <Download className="me-2" />
-                      {doc}
-                    </Button>
+              <h5>Project Summary</h5>
+              <p className="mb-4">{selectedProposal.summary}</p>
+
+              <h5>Research Objectives</h5>
+              <ul className="mb-4">
+                {selectedProposal.objectives?.map((obj, index) => (
+                  <li key={index}>{obj}</li>
+                ))}
+              </ul>
+
+              <h5>Budget Breakdown</h5>
+              <Table striped bordered className="mb-4">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(selectedProposal.budgetBreakdown || {}).map(([category, amount]) => (
+                    <tr key={category}>
+                      <td>{category.charAt(0).toUpperCase() + category.slice(1)}</td>
+                      <td>LKR {amount.toLocaleString()}</td>
+                    </tr>
                   ))}
-                </div>
+                  <tr className="table-active">
+                    <td><strong>Total</strong></td>
+                    <td><strong>LKR {selectedProposal.fundingRequested.toLocaleString()}</strong></td>
+                  </tr>
+                </tbody>
+              </Table>
+
+              <h5>Attachments</h5>
+              <div className="d-flex flex-wrap gap-2 mb-4">
+                {selectedProposal.documents?.map((doc, index) => (
+                  <Button 
+                    key={index} 
+                    variant="outline-primary" 
+                    size="sm"
+                    className="d-flex align-items-center"
+                  >
+                    <FileText className="me-1" />
+                    {doc}
+                  </Button>
+                ))}
               </div>
-              
-              <div className="col-md-4">
-                <Card className="shadow-sm">
-                  <Card.Header className="bg-light">
-                    <h5 className="mb-0">Review & Decision</h5>
-                  </Card.Header>
-                  <Card.Body>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Decision</Form.Label>
-                      <div className="d-grid gap-2">
-                        <Button 
-                          variant="outline-success" 
-                          className="text-start mb-2"
-                          onClick={() => handleStatusChange(selectedProposal.id, 'approved')}
-                        >
-                          <CheckCircle className="me-2" /> Approve Proposal
-                        </Button>
-                        <Button 
-                          variant="outline-danger" 
-                          className="text-start mb-3"
-                          onClick={() => handleStatusChange(selectedProposal.id, 'rejected')}
-                        >
-                          <XCircle className="me-2" /> Reject Proposal
-                        </Button>
-                      </div>
-                    </Form.Group>
-                    
-                    <Form.Group>
-                      <Form.Label>Feedback / Comments</Form.Label>
-                      <Form.Control
-                        as="textarea"
-                        rows={5}
-                        value={feedback}
-                        onChange={(e) => setFeedback(e.target.value)}
-                        placeholder="Provide detailed feedback for the researcher..."
-                      />
-                      <Form.Text className="text-muted">
-                        This feedback will be shared with the researcher.
-                      </Form.Text>
-                    </Form.Group>
-                  </Card.Body>
-                </Card>
-              </div>
+
+              {selectedProposal.status === 'pending' && (
+                <Form.Group className="mb-3">
+                  <Form.Label>Feedback / Comments</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={3}
+                    placeholder="Provide feedback or request revisions..."
+                    value={feedback}
+                    onChange={(e) => setFeedback(e.target.value)}
+                  />
+                </Form.Group>
+              )}
+
+              {selectedProposal.feedback && (
+                <Alert variant="info">
+                  <strong>Previous Feedback:</strong> {selectedProposal.feedback}
+                </Alert>
+              )}
             </div>
           )}
         </Modal.Body>
@@ -328,9 +341,35 @@ const ResearchProposals = () => {
           <Button variant="secondary" onClick={() => setShowDetails(false)}>
             Close
           </Button>
-          <Button variant="primary" onClick={handleSubmitReview}>
-            Save Review
-          </Button>
+          {selectedProposal?.status === 'pending' && (
+            <>
+              <Button 
+                variant="success"
+                onClick={() => {
+                  handleStatusChange(selectedProposal.id, 'approved');
+                  setShowDetails(false);
+                }}
+              >
+                <CheckCircle className="me-1" /> Approve
+              </Button>
+              <Button 
+                variant="danger"
+                onClick={() => {
+                  handleStatusChange(selectedProposal.id, 'rejected');
+                  setShowDetails(false);
+                }}
+              >
+                <XCircle className="me-1" /> Reject
+              </Button>
+              <Button 
+                variant="primary"
+                onClick={handleSubmitReview}
+                disabled={!feedback.trim()}
+              >
+                Request Revisions
+              </Button>
+            </>
+          )}
         </Modal.Footer>
       </Modal>
     </div>

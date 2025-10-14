@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Badge, Button, Form, Modal, Spinner } from 'react-bootstrap';
-import { Search, Filter, CheckCircle, XCircle, Clock, Person, Mail, Award, FileText } from 'react-bootstrap-icons';
+import { Card, Table, Button, Badge, Form, Modal, Spinner, Alert } from 'react-bootstrap';
+import { Search, Funnel as Filter, PersonCheck, PersonX, Envelope, ThreeDotsVertical as ThreeDots, FileEarmarkText } from 'react-bootstrap-icons';
 
 const SupervisorApprovals = () => {
   const [supervisors, setSupervisors] = useState([]);
@@ -8,27 +8,33 @@ const SupervisorApprovals = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSupervisor, setSelectedSupervisor] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
-  const [decision, setDecision] = useState('');
-  const [feedback, setFeedback] = useState('');
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
+  // Mock data - replace with actual API call
   useEffect(() => {
-    // Simulate API call
     const fetchSupervisors = async () => {
       try {
-        // Replace with actual API call
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         const mockData = [
           {
             id: 1,
             name: 'Dr. Sarah Johnson',
-            email: 's.johnson@university.edu',
+            email: 'sarah.johnson@example.com',
             department: 'Computer Science',
-            expertise: ['AI', 'Machine Learning', 'Data Science'],
+            specialization: 'Artificial Intelligence',
             status: 'pending',
-            applicationDate: '2023-10-10',
-            documents: ['cv.pdf', 'publications.pdf']
+            experience: 8,
+            dateSubmitted: '2023-10-10',
+            documents: ['cv.pdf', 'qualifications.pdf'],
+            bio: 'Expert in machine learning and neural networks with 8+ years of experience in AI research.'
           },
           // Add more mock data as needed
         ];
+        
         setSupervisors(mockData);
       } catch (error) {
         console.error('Error fetching supervisors:', error);
@@ -41,37 +47,52 @@ const SupervisorApprovals = () => {
   }, []);
 
   const handleApprove = (id) => {
-    // Handle approval logic
-    console.log(`Approved supervisor with ID: ${id}`);
-    // Update UI or make API call
+    // Update the status in the local state
+    setSupervisors(supervisors.map(supervisor => 
+      supervisor.id === id ? { ...supervisor, status: 'approved' } : supervisor
+    ));
   };
 
-  const handleReject = (id) => {
-    // Handle rejection logic
-    console.log(`Rejected supervisor with ID: ${id}`);
-    // Update UI or make API call
+  const handleReject = () => {
+    if (!rejectionReason.trim()) return;
+    
+    // Update the status in the local state
+    setSupervisors(supervisors.map(supervisor => 
+      supervisor.id === selectedSupervisor.id 
+        ? { 
+            ...supervisor, 
+            status: 'rejected',
+            rejectionReason 
+          } 
+        : supervisor
+    ));
+    
+    setShowRejectModal(false);
+    setRejectionReason('');
+    setSelectedSupervisor(null);
   };
 
-  const handleViewDetails = (supervisor) => {
-    setSelectedSupervisor(supervisor);
-    setShowDetails(true);
-  };
+  const filteredSupervisors = supervisors.filter(supervisor => {
+    const matchesSearch = 
+      supervisor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      supervisor.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      supervisor.department.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (statusFilter === 'all') return matchesSearch;
+    return supervisor.status === statusFilter && matchesSearch;
+  });
 
-  const handleSubmitDecision = () => {
-    // Handle decision submission
-    if (decision === 'approve') {
-      handleApprove(selectedSupervisor.id);
-    } else if (decision === 'reject') {
-      handleReject(selectedSupervisor.id);
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'approved':
+        return <Badge bg="success">Approved</Badge>;
+      case 'rejected':
+        return <Badge bg="danger">Rejected</Badge>;
+      case 'pending':
+      default:
+        return <Badge bg="warning" text="dark">Pending Review</Badge>;
     }
-    setShowDetails(false);
   };
-
-  const filteredSupervisors = supervisors.filter(supervisor =>
-    supervisor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    supervisor.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    supervisor.expertise.some(exp => exp.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
 
   if (loading) {
     return (
@@ -84,7 +105,10 @@ const SupervisorApprovals = () => {
   return (
     <div className="container-fluid">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="mb-0">Supervisor Approvals</h2>
+        <div>
+          <h2 className="mb-0">Supervisor Approvals</h2>
+          <p className="text-muted mb-0">Review and manage supervisor applications</p>
+        </div>
         <div className="d-flex">
           <div className="input-group" style={{ width: '300px' }}>
             <span className="input-group-text bg-white">
@@ -98,89 +122,97 @@ const SupervisorApprovals = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline-secondary" className="ms-2">
-            <Filter className="me-2" />
-            Filter
-          </Button>
+          <Form.Select 
+            className="ms-2" 
+            style={{ width: '200px' }}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </Form.Select>
         </div>
       </div>
 
       <Card className="shadow-sm">
-        <Card.Body>
+        <Card.Body className="p-0">
           <div className="table-responsive">
-            <Table hover className="align-middle">
+            <Table hover className="mb-0">
               <thead>
                 <tr>
                   <th>Name</th>
                   <th>Department</th>
-                  <th>Expertise</th>
-                  <th>Application Date</th>
+                  <th>Specialization</th>
+                  <th>Experience</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredSupervisors.map((supervisor) => (
-                  <tr key={supervisor.id}>
-                    <td>
-                      <div className="d-flex align-items-center">
-                        <div className="bg-light rounded-circle d-flex align-items-center justify-content-center me-2" style={{ width: '36px', height: '36px' }}>
-                          <Person size={20} className="text-primary" />
+                {filteredSupervisors.length > 0 ? (
+                  filteredSupervisors.map((supervisor) => (
+                    <tr key={supervisor.id}>
+                      <td>
+                        <div className="d-flex align-items-center">
+                          <div className="bg-light rounded-circle d-flex align-items-center justify-content-center me-2" style={{ width: '36px', height: '36px' }}>
+                            <PersonCheck className="text-primary" />
+                          </div>
+                          <div>
+                            <div className="fw-semibold">{supervisor.name}</div>
+                            <small className="text-muted">{supervisor.email}</small>
+                          </div>
                         </div>
-                        <div>
-                          <div className="fw-semibold">{supervisor.name}</div>
-                          <small className="text-muted">{supervisor.email}</small>
+                      </td>
+                      <td>{supervisor.department}</td>
+                      <td>{supervisor.specialization}</td>
+                      <td>{supervisor.experience} years</td>
+                      <td>{getStatusBadge(supervisor.status)}</td>
+                      <td>
+                        <div className="d-flex gap-2">
+                          <Button 
+                            variant="outline-primary" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedSupervisor(supervisor);
+                              setShowDetails(true);
+                            }}
+                          >
+                            View
+                          </Button>
+                          {supervisor.status === 'pending' && (
+                            <>
+                              <Button 
+                                variant="outline-success" 
+                                size="sm"
+                                onClick={() => handleApprove(supervisor.id)}
+                              >
+                                Approve
+                              </Button>
+                              <Button 
+                                variant="outline-danger" 
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedSupervisor(supervisor);
+                                  setShowRejectModal(true);
+                                }}
+                              >
+                                Reject
+                              </Button>
+                            </>
+                          )}
                         </div>
-                      </div>
-                    </td>
-                    <td>{supervisor.department}</td>
-                    <td>
-                      <div className="d-flex flex-wrap gap-1">
-                        {supervisor.expertise.slice(0, 2).map((exp, idx) => (
-                          <Badge key={idx} bg="light" text="dark" className="fw-normal">
-                            {exp}
-                          </Badge>
-                        ))}
-                        {supervisor.expertise.length > 2 && (
-                          <Badge bg="light" text="dark" className="fw-normal">
-                            +{supervisor.expertise.length - 2} more
-                          </Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td>{new Date(supervisor.applicationDate).toLocaleDateString()}</td>
-                    <td>
-                      <Badge bg={supervisor.status === 'approved' ? 'success' : 'warning'} className="text-uppercase">
-                        {supervisor.status}
-                      </Badge>
-                    </td>
-                    <td>
-                      <div className="d-flex gap-2">
-                        <Button 
-                          variant="outline-primary" 
-                          size="sm"
-                          onClick={() => handleViewDetails(supervisor)}
-                        >
-                          View
-                        </Button>
-                        <Button 
-                          variant="outline-success" 
-                          size="sm"
-                          onClick={() => handleApprove(supervisor.id)}
-                        >
-                          <CheckCircle className="me-1" /> Approve
-                        </Button>
-                        <Button 
-                          variant="outline-danger" 
-                          size="sm"
-                          onClick={() => handleReject(supervisor.id)}
-                        >
-                          <XCircle className="me-1" /> Reject
-                        </Button>
-                      </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" className="text-center py-4">
+                      <div className="text-muted">No supervisors found matching your criteria</div>
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </Table>
           </div>
@@ -190,77 +222,51 @@ const SupervisorApprovals = () => {
       {/* Supervisor Details Modal */}
       <Modal show={showDetails} onHide={() => setShowDetails(false)} size="lg">
         <Modal.Header closeButton>
-          <Modal.Title>Supervisor Application Details</Modal.Title>
+          <Modal.Title>Supervisor Details</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {selectedSupervisor && (
-            <div>
-              <div className="d-flex align-items-center mb-4">
-                <div className="bg-light rounded-circle d-flex align-items-center justify-content-center me-3" style={{ width: '60px', height: '60px' }}>
-                  <Person size={32} className="text-primary" />
+            <div className="row">
+              <div className="col-md-4 text-center mb-4">
+                <div className="bg-light rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style={{ width: '120px', height: '120px' }}>
+                  <PersonCheck size={48} className="text-primary" />
                 </div>
-                <div>
-                  <h4 className="mb-0">{selectedSupervisor.name}</h4>
-                  <p className="text-muted mb-0">{selectedSupervisor.email}</p>
-                  <p className="mb-0">{selectedSupervisor.department}</p>
-                </div>
+                <h5>{selectedSupervisor.name}</h5>
+                <p className="text-muted mb-0">{selectedSupervisor.email}</p>
+                <p className="text-muted">{selectedSupervisor.department}</p>
+                {getStatusBadge(selectedSupervisor.status)}
               </div>
-
-              <div className="row">
-                <div className="col-md-6">
-                  <h5>Expertise</h5>
-                  <div className="d-flex flex-wrap gap-2 mb-3">
-                    {selectedSupervisor.expertise.map((exp, idx) => (
-                      <Badge key={idx} bg="light" text="dark" className="fw-normal">
-                        {exp}
-                      </Badge>
-                    ))}
+              <div className="col-md-8">
+                <h6>Professional Information</h6>
+                <div className="mb-3">
+                  <p className="mb-1"><strong>Specialization:</strong> {selectedSupervisor.specialization}</p>
+                  <p className="mb-1"><strong>Experience:</strong> {selectedSupervisor.experience} years</p>
+                  <p className="mb-1"><strong>Date Submitted:</strong> {new Date(selectedSupervisor.dateSubmitted).toLocaleDateString()}</p>
+                </div>
+                
+                <h6>Biography</h6>
+                <p className="text-muted">{selectedSupervisor.bio}</p>
+                
+                <h6>Documents</h6>
+                <div className="d-flex flex-wrap gap-2 mb-3">
+                  {selectedSupervisor.documents.map((doc, index) => (
+                    <Button 
+                      key={index} 
+                      variant="outline-primary" 
+                      size="sm"
+                      className="d-flex align-items-center"
+                    >
+                      <FileEarmarkText className="me-1" />
+                      {doc}
+                    </Button>
+                  ))}
+                </div>
+                
+                {selectedSupervisor.status === 'rejected' && selectedSupervisor.rejectionReason && (
+                  <div className="alert alert-danger">
+                    <strong>Rejection Reason:</strong> {selectedSupervisor.rejectionReason}
                   </div>
-
-                  <h5>Documents</h5>
-                  <ul className="list-unstyled">
-                    {selectedSupervisor.documents.map((doc, idx) => (
-                      <li key={idx} className="mb-1">
-                        <a href={`#view-${doc}`} className="text-decoration-none">
-                          <FileText className="me-2" />
-                          {doc}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="col-md-6">
-                  <h5>Review Application</h5>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Decision</Form.Label>
-                    <div className="d-flex gap-3 mb-3">
-                      <Form.Check
-                        type="radio"
-                        id="approve"
-                        label="Approve"
-                        name="decision"
-                        value="approve"
-                        onChange={(e) => setDecision(e.target.value)}
-                      />
-                      <Form.Check
-                        type="radio"
-                        id="reject"
-                        label="Reject"
-                        name="decision"
-                        value="reject"
-                        onChange={(e) => setDecision(e.target.value)}
-                      />
-                    </div>
-                    <Form.Label>Feedback (Optional)</Form.Label>
-                    <Form.Control
-                      as="textarea"
-                      rows={3}
-                      value={feedback}
-                      onChange={(e) => setFeedback(e.target.value)}
-                      placeholder="Provide feedback for the applicant..."
-                    />
-                  </Form.Group>
-                </div>
+                )}
               </div>
             </div>
           )}
@@ -269,8 +275,58 @@ const SupervisorApprovals = () => {
           <Button variant="secondary" onClick={() => setShowDetails(false)}>
             Close
           </Button>
-          <Button variant="primary" onClick={handleSubmitDecision}>
-            Submit Decision
+          {selectedSupervisor?.status === 'pending' && (
+            <>
+              <Button 
+                variant="success"
+                onClick={() => {
+                  handleApprove(selectedSupervisor.id);
+                  setShowDetails(false);
+                }}
+              >
+                Approve Application
+              </Button>
+              <Button 
+                variant="danger"
+                onClick={() => {
+                  setShowDetails(false);
+                  setShowRejectModal(true);
+                }}
+              >
+                Reject Application
+              </Button>
+            </>
+          )}
+        </Modal.Footer>
+      </Modal>
+
+      {/* Rejection Reason Modal */}
+      <Modal show={showRejectModal} onHide={() => setShowRejectModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Reject Application</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form.Group className="mb-3">
+            <Form.Label>Reason for Rejection</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              placeholder="Please provide a reason for rejecting this application..."
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowRejectModal(false)}>
+            Cancel
+          </Button>
+          <Button 
+            variant="danger" 
+            onClick={handleReject}
+            disabled={!rejectionReason.trim()}
+          >
+            Confirm Rejection
           </Button>
         </Modal.Footer>
       </Modal>
