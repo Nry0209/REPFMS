@@ -232,5 +232,4 @@ const AdminAuth = ({ setAuth }) => {
     </>
   );
 };
-//test
 export default AdminAuth;
