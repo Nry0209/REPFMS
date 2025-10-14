@@ -605,7 +605,7 @@ import multer from "multer";
 const router = express.Router();
 
 // ✅ Ensure folders exist
-["uploads/researcher/cv", "uploads/researcher/transcripts"].forEach((dir) => {
+["uploads/researcher", "uploads/researcher/cv", "uploads/researcher/transcripts", "uploads/researcher/profile"].forEach((dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
