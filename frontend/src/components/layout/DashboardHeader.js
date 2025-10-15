@@ -474,10 +474,30 @@ const DashboardHeader = ({ auth = {}, setAuth }) => {
                 Profile
               </Nav.Link>
               <Nav.Link as={Link} to="/about">About Us</Nav.Link>
+              
+              <NavDropdown title="Gallery" id="galleryDropdown">
+                <NavDropdown.Item
+                  as="a"
+                   href="https://most.gov.lk/web/index.php?option=com_phocagallery&view=categories&Itemid=108&lang=en"
+                   target="_blank"
+                   rel="noreferrer"
+                >
+                  Image Gallery
+                </NavDropdown.Item>
+                <NavDropdown.Item
+                  as="a"
+                  href="https://most.gov.lk/web/index.php?option=com_content&view=article&id=29&Itemid=152&lang=en"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Video Gallery
+                </NavDropdown.Item>
+              </NavDropdown>
             </Nav>
           </Navbar.Collapse>
         </Container>
       </Navbar>
+
     </header>
   );
 };
