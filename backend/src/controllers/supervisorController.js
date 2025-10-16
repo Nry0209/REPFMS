@@ -2,11 +2,21 @@ import Supervisor from "../models/Supervisor.js";
 import fs from "fs";
 import path from "path";
 
+// =================== HELPER TO PARSE ARRAY FIELDS ===================
+const parseField = (field) => {
+  if (!field) return [];
+  if (typeof field === "string") {
+    try { return JSON.parse(field); } 
+    catch { return [field]; }
+  }
+  return Array.isArray(field) ? field : [field];
+};
+
 // =================== GET PROFILE ===================
 export const getSupervisorProfile = async (req, res) => {
   try {
     console.log('Getting profile for user:', req.user._id);
-    
+
     const supervisor = await Supervisor.findById(req.user._id)
       .select('-password')
       .populate('supervisions');
@@ -21,7 +31,6 @@ export const getSupervisorProfile = async (req, res) => {
 
     console.log('Returning profile for:', supervisor.email);
 
-    // Use the method from the model to get proper profile image URL
     const profileData = {
       _id: supervisor._id,
       name: supervisor.name,
@@ -33,7 +42,7 @@ export const getSupervisorProfile = async (req, res) => {
       experience: supervisor.experience,
       domains: supervisor.domains,
       studies: supervisor.studies,
-      profileImage: supervisor.getProfileImageUrl(), // Use the model method
+      profileImage: supervisor.getProfileImageUrl(),
       availability: supervisor.availability,
       skills: supervisor.skills,
       languages: supervisor.languages,
@@ -61,7 +70,6 @@ export const getSupervisorProfile = async (req, res) => {
   }
 };
 
-
 // =================== UPDATE PROFILE ===================
 export const updateSupervisorProfile = async (req, res) => {
   try {
@@ -71,7 +79,7 @@ export const updateSupervisorProfile = async (req, res) => {
     console.log("Uploaded file:", req.file);
 
     const supervisor = await Supervisor.findById(req.user._id);
-    
+
     if (!supervisor) {
       return res.status(404).json({ 
         success: false,
@@ -79,7 +87,11 @@ export const updateSupervisorProfile = async (req, res) => {
       });
     }
 
-    const { name, phone, address, title, affiliation, experience, skills, awards, qualifications, removeProfileImage } = req.body;
+    const { 
+      name, phone, address, title, affiliation, experience, 
+      skills, awards, qualifications, languages, researchInterests, 
+      removeProfileImage 
+    } = req.body;
 
     // =================== REMOVE PROFILE IMAGE ===================
     if (removeProfileImage === "true") {
@@ -118,24 +130,16 @@ export const updateSupervisorProfile = async (req, res) => {
     if (experience) supervisor.experience = parseInt(experience);
 
     // =================== UPDATE ARRAY FIELDS ===================
-    if (skills) {
-      try { supervisor.skills = JSON.parse(skills); } 
-      catch (e) { console.error("Failed to parse skills:", e); }
-    }
-    if (awards) {
-      try { supervisor.awards = JSON.parse(awards); } 
-      catch (e) { console.error("Failed to parse awards:", e); }
-    }
-    if (qualifications) {
-      try { supervisor.qualifications = JSON.parse(qualifications); } 
-      catch (e) { console.error("Failed to parse qualifications:", e); }
-    }
+    if (skills) supervisor.skills = parseField(skills);
+    if (awards) supervisor.awards = parseField(awards);
+    if (qualifications) supervisor.qualifications = parseField(qualifications);
+    if (languages) supervisor.languages = parseField(languages);
+    if (researchInterests) supervisor.researchInterests = parseField(researchInterests);
 
     // =================== UPLOAD NEW PROFILE IMAGE ===================
     if (req.file) {
       console.log("Processing profile image:", req.file);
 
-      // Delete old profile image
       if (supervisor.profileImage?.path && supervisor.profileImage.path !== "/profile-placeholder.png") {
         const oldImagePath = path.join(process.cwd(), supervisor.profileImage.path.replace(/^\//, ''));
         if (fs.existsSync(oldImagePath)) {
@@ -148,7 +152,6 @@ export const updateSupervisorProfile = async (req, res) => {
         }
       }
 
-      // Read uploaded file and save
       const imageBuffer = fs.readFileSync(req.file.path);
       supervisor.profileImage = {
         data: imageBuffer,
@@ -192,7 +195,7 @@ export const updateSupervisorProfile = async (req, res) => {
       message: "Profile updated successfully", 
       supervisor: updatedProfile
     });
-    
+
   } catch (error) {
     console.error("Update Supervisor Profile Error:", error);
     res.status(500).json({ 

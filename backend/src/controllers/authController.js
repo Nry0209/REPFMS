@@ -128,14 +128,7 @@ const generateToken = (id, role) =>
 // ✅ Supervisor Registration
 export const registerSupervisor = async (req, res) => {
   try {
-    const {
-      name,
-      email,
-      password,
-      phone,
-      address,
-      title,
-      affiliation,
+    const {name,email,password,phone,address,title,affiliation,
       experience,
       domains,
       studies,
