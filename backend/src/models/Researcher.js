@@ -41,46 +41,6 @@
 //       type: String,
 //       trim: true,
 //     },
-//     cvFile: {
-//       type: String, // file path for uploaded CV
-//     },
-//     transcripts: {
-//       type: Map,
-//       of: String, // qualification -> transcript file path
-//       default: {},
-//     },
-//     linkedin: {
-//       type: String,
-//       trim: true,
-//     },
-//     scopus: {
-//       type: String,
-//       trim: true,
-//     },
-//     googleScholar: {
-//       type: String,
-//       trim: true,
-//     },
-//     researches: [
-//       { type: mongoose.Schema.Types.ObjectId, ref: "Research" },
-//     ],
-//     currentResearch: {
-//       type: mongoose.Schema.Types.ObjectId,
-//       ref: "Research",
-//     },
-//   },
-//   { timestamps: true }
-// );
-
-// export default mongoose.model("Researcher", researcherSchema);
-
-// import mongoose from "mongoose";
-
-// const researcherSchema = new mongoose.Schema(
-//   {
-//     fullName: { type: String, required: true, trim: true },
-//     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
-//     password: { type: String, required: true, minlength: 6 },
 //     degree: { type: String, required: true, trim: true },
 //     domains: {
 //       type: [String],

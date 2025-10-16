@@ -37,7 +37,7 @@ import {
   ArrowRepeat as RefreshCw
 } from 'react-bootstrap-icons';
 import SupervisorApprovals from './admin/SupervisorApprovals';
-import ResearchProposals from './admin/ResearchProposals';
+import ResearchManagement from './admin/ResearchManagement';
 import FundingReview from './admin/FundingReview';
 import SupervisionAllocation from './admin/SupervisionAllocation';
 import AnalyticsReports from './admin/AnalyticsReports';
@@ -60,7 +60,7 @@ const AdminDashboard = ({ auth, setAuth }) => {
   const navItems = [
     { id: 'dashboard', icon: <HouseDoor size={20} />, label: 'Dashboard' },
     { id: 'supervisors', icon: <People size={20} />, label: 'Supervisor Approvals', badge: 5 },
-    { id: 'proposals', icon: <FileEarmarkText size={20} />, label: 'Research Proposals' },
+    { id: 'proposals', icon: <FileEarmarkText size={20} />, label: 'Research Management' },
     { id: 'funding', icon: <CurrencyDollar size={20} />, label: 'Funding Review', badge: 12 },
     { id: 'supervision', icon: <People size={20} />, label: 'Supervision Allocation' },
     { id: 'reports', icon: <GraphUp size={20} />, label: 'Analytics & Reports' },
@@ -590,7 +590,7 @@ const AdminDashboard = ({ auth, setAuth }) => {
 
         {/* Tab Content */}
         {activeTab === 'supervisors' && <SupervisorApprovals />}
-        {activeTab === 'proposals' && <ResearchProposals />}
+        {activeTab === 'proposals' && <ResearchManagement />}
         {activeTab === 'funding' && <FundingReview />}
         {activeTab === 'supervision' && <SupervisionAllocation />}
         {activeTab === 'reports' && <AnalyticsReports />}

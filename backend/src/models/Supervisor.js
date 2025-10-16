@@ -67,6 +67,20 @@ const supervisorSchema = new mongoose.Schema(
     },
 
     // ✅ Account status
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
+    },
+    approvedAt: {
+      type: Date,
+    },
+    rejectedAt: {
+      type: Date,
+    },
+    rejectionReason: {
+      type: String,
+    },
     isActive: {
       type: Boolean,
       default: true,
