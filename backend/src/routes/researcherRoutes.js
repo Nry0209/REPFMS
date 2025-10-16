@@ -768,6 +768,54 @@ router.get("/research/:id", verifyToken, async (req, res) => {
   }
 });
 
+// ✅ Get compatible supervisors for a research (by domains)
+router.get("/research/:id/supervisors", verifyToken, async (req, res) => {
+  try {
+    const research = await Research.findById(req.params.id);
+    if (!research) return res.status(404).json({ success: false, message: "Research not found" });
+
+    const supervisors = await Supervisor.find({
+      domains: { $in: research.domains || [] },
+    })
+      .select("name email domains profileImage googleScholar scopus availability")
+      .limit(50)
+      .lean();
+
+    const mapped = supervisors.map((s) => ({
+      _id: s._id,
+      name: s.name,
+      email: s.email,
+      domain: (s.domains || [])[0] || "",
+      profileImage: s?.profileImage?.path || "/profile-placeholder.png",
+      googleScholar: s.googleScholar || "",
+      scopus: s.scopus || "",
+      available: s.availability === "Available",
+    }));
+
+    return res.json({ success: true, data: mapped });
+  } catch (err) {
+    console.error("Get research supervisors error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ✅ Get Ongoing Projects (filtered by researcher's domains)
+router.get("/ongoing-projects", verifyToken, async (req, res) => {
+  try {
+    const me = await Researcher.findById(req.userId).select("domains");
+    const filter = { status: "Current" };
+    if (me?.domains?.length) {
+      filter.domains = { $in: me.domains };
+    }
+    const projects = await Research.find(filter)
+      .populate("researcher", "fullName email");
+    res.json({ success: true, data: projects });
+  } catch (err) {
+    console.error("Get ongoing-projects error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 // ✅ Request Supervision for a Research
 // If the research doesn't belong to the requester, clone a new research under the requester with Pending status
 router.post("/research/:id/request-supervision", verifyToken, async (req, res) => {
@@ -825,11 +873,71 @@ router.get("/my/pending-requests", verifyToken, async (req, res) => {
     const requests = await Supervision.find({
       researcher: req.userId,
       status: "Pending",
-    }).populate("supervisor", "fullName email");
+    }).populate("supervisor", "name email googleScholar scopus profileImage");
 
     res.json({ success: true, data: requests });
   } catch (err) {
     console.error("Get pending requests error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ✅ Get Researcher's All Supervision Requests
+router.get("/my/requests", verifyToken, async (req, res) => {
+  try {
+    const requests = await Supervision.find({
+      researcher: req.userId,
+    }).populate("supervisor", "fullName email");
+
+    res.json({ success: true, data: requests });
+  } catch (err) {
+    console.error("Get requests error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ✅ Get Researcher's Active Researches
+router.get("/my/active-research", verifyToken, async (req, res) => {
+  try {
+    const items = await Research.find({ researcher: req.userId, status: "Current" })
+      .populate({
+        path: "coResearchers",
+        select: "fullName email googleScholar scopus profilePhoto",
+      })
+      .populate({
+        path: "supervisionRef",
+        populate: { path: "supervisor", select: "name email googleScholar scopus profileImage" },
+      });
+
+    const mapped = items.map((r) => ({
+      _id: r._id,
+      title: r.title,
+      startDate: r.createdAt,
+      researchPaper: r.paperUrl || null,
+      supervisor: r.supervisionRef?.supervisor
+        ? {
+            _id: r.supervisionRef.supervisor._id,
+            name: r.supervisionRef.supervisor.name,
+            email: r.supervisionRef.supervisor.email,
+            profileImage: r.supervisionRef.supervisor?.profileImage?.path || "/profile-placeholder.png",
+            googleScholar: r.supervisionRef.supervisor.googleScholar || "",
+            scopus: r.supervisionRef.supervisor.scopus || "",
+          }
+        : null,
+      coResearchers: (r.coResearchers || []).map((c) => ({
+        _id: c._id,
+        name: c.fullName,
+        email: c.email,
+        profilePhoto: c.profilePhoto || null,
+        googleScholar: c.googleScholar || "",
+        scopus: c.scopus || "",
+      })),
+      comments: (r.supervisionRef?.feedbacks || []).slice().reverse(),
+    }));
+
+    res.json({ success: true, data: mapped });
+  } catch (err) {
+    console.error("Get active research error:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
@@ -984,57 +1092,73 @@ router.put(
   }
 );
 
+// ✅ Delete current Researcher profile (and related data)
+router.delete("/profile", verifyToken, async (req, res) => {
+  try {
+    await Research.deleteMany({ researcher: req.userId });
+    await Supervision.deleteMany({ researcher: req.userId });
+    const deleted = await Researcher.findByIdAndDelete(req.userId);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: "Researcher not found" });
+    }
+    return res.json({ success: true, message: "Profile deleted" });
+  } catch (err) {
+    console.error("Delete researcher profile error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 // ✅ Get All Researchers (for viewing other researchers)
 router.get("/all", verifyToken, async (req, res) => {
-  try {
-    const researchers = await Researcher.find()
-      .select("-password")
-      .populate("researches");
+try {
+const researchers = await Researcher.find()
+  .select("-password")
+  .populate("researches");
 
-    res.json({
-      success: true,
-      data: researchers
-    });
-  } catch (err) {
-    console.error("Get all researchers error:", err);
-    res.status(500).json({ 
-      success: false,
-      message: "Server error" 
-    });
-  }
+res.json({
+  success: true,
+  data: researchers
+});
+} catch (err) {
+console.error("Get all researchers error:", err);
+res.status(500).json({ 
+  success: false,
+  message: "Server error" 
+});
+}
 });
 
 // ✅ Get Researcher by ID
 router.get("/:id", verifyToken, async (req, res) => {
-  try {
-    const researcher = await Researcher.findById(req.params.id)
-      .select("-password")
-      .populate("researches");
+try {
+const researcher = await Researcher.findById(req.params.id)
+  .select("-password")
+  .populate("researches");
 
-    if (!researcher)
-      return res.status(404).json({ 
-        success: false,
-        message: "Researcher not found" 
-      });
+if (!researcher)
+  return res.status(404).json({ 
+    success: false,
+    message: "Researcher not found" 
+  });
 
-    res.json({
-      success: true,
-      data: researcher
-    });
-  } catch (err) {
-    console.error("Get researcher by ID error:", err);
-    res.status(500).json({ 
-      success: false,
-      message: "Server error" 
-    });
-  }
+res.json({
+  success: true,
+  data: researcher
+});
+} catch (err) {
+console.error("Get researcher by ID error:", err);
+res.status(500).json({ 
+  success: false,
+  message: "Server error" 
+});
+}
 });
 
 // ✅ Get Researcher's Researches
 router.get("/my/researches", verifyToken, async (req, res) => {
-  try {
-    const researches = await Research.find({ researcher: req.userId })
-      .populate("coResearchers", "fullName email");
+try {
+const researches = await Research.find({ researcher: req.userId })
+  .populate("coResearchers", "fullName email");
 
     res.json({
       success: true,

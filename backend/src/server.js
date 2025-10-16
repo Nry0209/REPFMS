@@ -151,7 +151,7 @@ import connectDB from "./config/db.js";
 import supervisorRoutes from "./routes/supervisorRoutes.js";
 import researcherRoutes from "./routes/researcherRoutes.js";
 import supervisionRoutes from "./routes/supervisionRoutes.js";
-import ministryRoutes from "./routes/ministryRoutes.js";
+import ministryRoutes from "./routes/MinistryRoutes.js";
 import fundingRoutes from "./routes/fundingRoutes.js";
 
 // Load environment variables

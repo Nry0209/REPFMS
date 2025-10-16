@@ -66,6 +66,25 @@
 //     }
 //   };
 
+//   const fetchActiveResearch = async () => {
+//     try {
+//       setLoadingActive(true);
+//       setActiveError("");
+//       const token = localStorage.getItem("researcherToken");
+//       if (!token) return;
+//       const res = await fetch("http://localhost:5000/api/researchers/my/active-research", {
+//         headers: { Authorization: `Bearer ${token}` },
+//       });
+//       const data = await res.json();
+//       if (!res.ok || !data?.success) throw new Error(data?.message || "Failed to load active research");
+//       setActiveList(Array.isArray(data.data) ? data.data : []);
+//     } catch (e) {
+//       setActiveError(e.message || "Failed to load active research");
+//     } finally {
+//       setLoadingActive(false);
+//     }
+//   };
+
 //   const calculateStats = (researcher) => {
 //     const researches = researcher.researches || [];
 //     setStats({
@@ -971,6 +990,9 @@ const ResearcherDashboard = () => {
   const [toasts, setToasts] = useState([]);
   // Comments are supervisor-only; researcher dashboard shows them read-only
   const [fundingModal, setFundingModal] = useState({ show: false, research: null });
+  const [activeList, setActiveList] = useState([]);
+  const [loadingActive, setLoadingActive] = useState(false);
+  const [activeError, setActiveError] = useState("");
   const [stats, setStats] = useState({
     totalResearches: 0,
     currentSupervision: 0,
@@ -980,6 +1002,7 @@ const ResearcherDashboard = () => {
   const navigate = useNavigate();
   const activeRef = useRef(null);
   const ongoingRef = useRef(null);
+  const [activeUploads, setActiveUploads] = useState({}); // { [id]: File }
 
   useEffect(() => {
     fetchProfile();
@@ -988,6 +1011,7 @@ const ResearcherDashboard = () => {
     // Listen for immediate refresh requests fired from other pages
     const onUpdated = () => fetchPendingRequests();
     window.addEventListener('pending-requests-updated', onUpdated);
+    fetchActiveResearch();
     return () => {
       clearInterval(id);
       window.removeEventListener('pending-requests-updated', onUpdated);
@@ -1058,6 +1082,28 @@ const ResearcherDashboard = () => {
       finishedResearches: researches.filter(r => r.status === "Finished").length,
       pendingResearches: researches.filter(r => r.status === "Pending").length,
     });
+  };
+
+  const fetchActiveResearch = async () => {
+    try {
+      setLoadingActive(true);
+      setActiveError("");
+      const token = localStorage.getItem("researcherToken");
+      if (!token) {
+        setActiveList([]);
+        return;
+      }
+      const res = await fetch("http://localhost:5000/api/researchers/my/active-research", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) throw new Error(data?.message || "Failed to load active research");
+      setActiveList(Array.isArray(data.data) ? data.data : []);
+    } catch (e) {
+      setActiveError(e.message || "Failed to load active research");
+    } finally {
+      setLoadingActive(false);
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -1220,6 +1266,8 @@ const ResearcherDashboard = () => {
             </Card>
           </Col>
         </Row>
+
+        {/* Active Research moved below Ongoing Projects */}
 
         {/* Statistics Cards */}
         <Row className="mb-4">
@@ -1423,9 +1471,82 @@ const ResearcherDashboard = () => {
                           <tr key={r._id}>
                             <td>{r.title}</td>
                             <td>{r.domains?.map((d, i) => (<Badge key={i} bg="info" className="me-1">{d}</Badge>))}</td>
-                            <td>{getStatusBadge(r.status)}</td>
+                            <td>{getStatusBadge((r.approval === 'Accepted') ? 'Accepted' : r.status)}</td>
                             <td>
                               <Button size="sm" variant="outline-primary" onClick={() => navigate(`/researcher/research/${r._id}`)}>View</Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Active Research */}
+        <Row className="mb-4">
+          <Col>
+            <Card className="shadow">
+              <Card.Header className="bg-light">
+                <h5 className="mb-0">Active Research</h5>
+              </Card.Header>
+              <Card.Body>
+                {loadingActive ? (
+                  <div className="text-center"><Spinner animation="border" /></div>
+                ) : activeError ? (
+                  <Alert variant="danger" className="mb-0">{activeError}</Alert>
+                ) : activeList.length === 0 ? (
+                  <p className="text-muted mb-0">No active research</p>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-hover">
+                      <thead>
+                        <tr>
+                          <th>Title</th>
+                          <th>Start Date</th>
+                          <th>Supervisor</th>
+                          <th>Co-Researchers</th>
+                          <th>Paper</th>
+                          <th>Comments</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activeList.map((r) => (
+                          <tr key={r._id}>
+                            <td>{r.title}</td>
+                            <td>{r.startDate ? new Date(r.startDate).toLocaleDateString() : '-'}</td>
+                            <td>{r.supervisor?.name || '-'}</td>
+                            <td>
+                              {(r.coResearchers || []).length === 0 ? (
+                                <span className="text-muted">None</span>
+                              ) : (
+                                (r.coResearchers || []).map((c, i) => (
+                                  <Button key={c._id || i} size="sm" variant="outline-secondary" className="me-1 mb-1" onClick={() => openCoactorSupervisor(c)}>
+                                    {c.name || c.fullName || c.email}
+                                  </Button>
+                                ))
+                              )}
+                            </td>
+                            <td>
+                              <div className="d-flex align-items-center gap-2">
+                                <Form.Control size="sm" type="file" accept=".pdf,.doc,.docx" onChange={(e) => setActiveUploads((m) => ({ ...m, [r._id]: e.target.files?.[0] || null }))} />
+                                <Button size="sm" variant="primary" disabled={!activeUploads[r._id]} onClick={() => setToasts((t)=>[...t,{id:Date.now(),bg:"success",text:"Paper selected (stub)."}])}>Upload</Button>
+                                {r.researchPaper ? (
+                                  <a href={r.researchPaper} target="_blank" rel="noreferrer">Open</a>
+                                ) : (
+                                  <span className="text-muted">None</span>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              <Button size="sm" variant="outline-primary" onClick={() => activeRef.current?.scrollIntoView({ behavior: 'smooth' })}>View</Button>
+                            </td>
+                            <td>
+                              <Button size="sm" variant="outline-primary" onClick={() => activeRef.current?.scrollIntoView({ behavior: 'smooth' })}>View</Button>
                             </td>
                           </tr>
                         ))}
