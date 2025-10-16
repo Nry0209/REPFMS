@@ -63,6 +63,21 @@ export const getSupervisorProfile = async (req, res) => {
 
 
 // =================== UPDATE PROFILE ===================
+// @desc    Get all supervisors for dropdown
+// @route   GET /api/supervisors/list
+// @access  Public
+export const getAllSupervisors = async (req, res) => {
+  try {
+    const supervisors = await Supervisor.find({}, 'name email department')
+      .sort({ name: 1 });
+    
+    res.json(supervisors);
+  } catch (error) {
+    console.error('Error fetching supervisors:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 export const updateSupervisorProfile = async (req, res) => {
   try {
     console.log("=== Update Profile Request ===");

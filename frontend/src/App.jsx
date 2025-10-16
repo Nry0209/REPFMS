@@ -204,7 +204,6 @@ import AdminDashboard from "./pages/AdminDashboard";
 import SupervisorApprovals from "./pages/admin/SupervisorApprovals";
 import ResearchManagement from "./pages/admin/ResearchManagement";
 import FundingReview from "./pages/admin/FundingReview";
-import SupervisionAllocation from "./pages/admin/SupervisionAllocation";
 import AnalyticsReports from "./pages/admin/AnalyticsReports";
 
 // Researcher Pages
@@ -350,12 +349,6 @@ const App = () => {
           path="/admin/funding"
           element={
             auth.admin ? <FundingReview auth={auth} setAuth={setAuth} /> : <Navigate to="/admin/auth" />
-          }
-        />
-        <Route
-          path="/admin/allocations"
-          element={
-            auth.admin ? <SupervisionAllocation auth={auth} setAuth={setAuth} /> : <Navigate to="/admin/auth" />
           }
         />
         <Route

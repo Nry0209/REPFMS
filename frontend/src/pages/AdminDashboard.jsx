@@ -39,7 +39,6 @@ import {
 import SupervisorApprovals from './admin/SupervisorApprovals';
 import ResearchManagement from './admin/ResearchManagement';
 import FundingReview from './admin/FundingReview';
-import SupervisionAllocation from './admin/SupervisionAllocation';
 import AnalyticsReports from './admin/AnalyticsReports';
 import { useNavigate } from 'react-router-dom';
 
@@ -62,7 +61,6 @@ const AdminDashboard = ({ auth, setAuth }) => {
     { id: 'supervisors', icon: <People size={20} />, label: 'Supervisor Approvals', badge: 5 },
     { id: 'proposals', icon: <FileEarmarkText size={20} />, label: 'Research Management' },
     { id: 'funding', icon: <CurrencyDollar size={20} />, label: 'Funding Review', badge: 12 },
-    { id: 'supervision', icon: <People size={20} />, label: 'Supervision Allocation' },
     { id: 'reports', icon: <GraphUp size={20} />, label: 'Analytics & Reports' },
   ];
 
@@ -592,7 +590,6 @@ const AdminDashboard = ({ auth, setAuth }) => {
         {activeTab === 'supervisors' && <SupervisorApprovals />}
         {activeTab === 'proposals' && <ResearchManagement />}
         {activeTab === 'funding' && <FundingReview />}
-        {activeTab === 'supervision' && <SupervisionAllocation />}
         {activeTab === 'reports' && <AnalyticsReports />}
         {activeTab === 'settings' && (
           <Card className="border-0 shadow-sm">

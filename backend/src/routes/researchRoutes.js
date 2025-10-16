@@ -6,13 +6,15 @@ import {
   assignSupervisor,
   getAvailableSupervisors,
   updateSupervisorStatus,
-  deleteResearch 
+  deleteResearch,
+  getResearchTitles
 } from '../controllers/researchController.js';
 
 const router = express.Router();
 
 // Public routes
 router.get('/', getResearches);
+router.get('/titles', getResearchTitles);
 router.get('/:id', getResearchById);
 
 // Supervisor assignment

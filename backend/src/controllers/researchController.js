@@ -245,12 +245,29 @@ export const getAvailableSupervisors = async (req, res) => {
   try {
     const supervisors = await mongoose.model('Supervisor')
       .find({})
-      .select('name email title domains')
+      .select('name email department')
       .sort({ name: 1 });
     
     res.json(supervisors);
   } catch (error) {
-    console.error('Error fetching supervisors:', error);
+    console.error('Error fetching available supervisors:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get research titles with researcher info for dropdown
+// @route   GET /api/researches/titles
+// @access  Public
+export const getResearchTitles = async (req, res) => {
+  try {
+    const researches = await Research.find({})
+      .populate('researcher', 'fullName email')
+      .select('title researcher')
+      .sort({ title: 1 });
+    
+    res.json(researches);
+  } catch (error) {
+    console.error('Error fetching research titles:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
