@@ -799,9 +799,9 @@ const ResearcherProfile = () => {
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("researcherToken");
       if (!token) {
-        navigate("/researcher/login");
+        navigate("/researcher/auth");
         return;
       }
 
@@ -837,8 +837,8 @@ const ResearcherProfile = () => {
       console.error("Fetch profile error:", err);
       setError(err.message);
       if (err.message.includes("authorized")) {
-        localStorage.removeItem("token");
-        navigate("/researcher/login");
+        localStorage.removeItem("researcherToken");
+        navigate("/researcher/auth");
       }
     } finally {
       setLoading(false);
@@ -880,7 +880,7 @@ const ResearcherProfile = () => {
     if (!file) return;
     try {
       setPhotoUploading(true);
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("researcherToken");
       const fd = new FormData();
       fd.append("profilePhoto", file);
       const res = await fetch("http://localhost:5000/api/researchers/profile", {
@@ -906,7 +906,7 @@ const ResearcherProfile = () => {
     setSuccess("");
 
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("researcherToken");
       const formDataToSend = new FormData();
 
       // Append text fields
@@ -1312,7 +1312,7 @@ const ResearcherProfile = () => {
                           onClick={async () => {
                             try {
                               setSaving(true);
-                              const token = localStorage.getItem("token");
+                              const token = localStorage.getItem("researcherToken");
                               const fd = new FormData();
                               fd.append("skills", skillsInput);
                               const res = await fetch("http://localhost:5000/api/researchers/profile", {
