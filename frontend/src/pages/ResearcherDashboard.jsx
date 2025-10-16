@@ -996,9 +996,9 @@ const ResearcherDashboard = () => {
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("researcherToken");
       if (!token) {
-        navigate("/researcher/login");
+        navigate("/researcher/auth");
         return;
       }
 
@@ -1022,8 +1022,8 @@ const ResearcherDashboard = () => {
       console.error("Fetch profile error:", err);
       setError(err.message);
       if (err.message.includes("authorized")) {
-        localStorage.removeItem("token");
-        navigate("/researcher/login");
+        localStorage.removeItem("researcherToken");
+        navigate("/researcher/auth");
       }
     } finally {
       setLoading(false);
@@ -1032,7 +1032,7 @@ const ResearcherDashboard = () => {
 
   const fetchPendingRequests = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("researcherToken");
       let apiList = [];
       if (token) {
         const res = await fetch("http://localhost:5000/api/researchers/my/pending-requests", {
