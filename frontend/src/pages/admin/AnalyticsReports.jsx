@@ -28,7 +28,7 @@ const AnalyticsReports = () => {
   const [loading, setLoading] = useState(false);
   const [reportType, setReportType] = useState('summary');
   
-  // Mock data - replace with actual API calls
+  // Empty datasets (no mock data)
   const [reportData, setReportData] = useState({
     fundingTrends: [],
     researchDomains: [],
@@ -39,106 +39,19 @@ const AnalyticsReports = () => {
   });
 
   useEffect(() => {
-    // Simulate API call to fetch data
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // This would be replaced with actual API calls
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Mock data based on time range
-        const mockData = {
-          fundingTrends: getFundingTrendsData(timeRange),
-          researchDomains: getResearchDomainsData(),
-          supervisorLoad: getSupervisorLoadData(),
-          rejectionReasons: getRejectionReasonsData(),
-          studentProgress: getStudentProgressData(),
-          publicationTrends: getPublicationTrendsData()
-        };
-        
-        setReportData(mockData);
-      } catch (error) {
-        console.error('Error fetching analytics data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    // No mock fetching; keep empty until integrated with API
+    setReportData({
+      fundingTrends: [],
+      researchDomains: [],
+      supervisorLoad: [],
+      rejectionReasons: [],
+      studentProgress: [],
+      publicationTrends: []
+    });
+    setLoading(false);
   }, [timeRange]);
 
-  // Mock data generation functions
-  const getFundingTrendsData = (range) => {
-    if (range === 'last_year') {
-      return [
-        { name: 'Jan', amount: 40000 },
-        { name: 'Feb', amount: 30000 },
-        { name: 'Mar', amount: 50000 },
-        { name: 'Apr', amount: 27800 },
-        { name: 'May', amount: 18900 },
-        { name: 'Jun', amount: 23900 },
-        { name: 'Jul', amount: 34900 },
-        { name: 'Aug', amount: 42000 },
-        { name: 'Sep', amount: 38000 },
-        { name: 'Oct', amount: 45000 },
-        { name: 'Nov', amount: 52000 },
-        { name: 'Dec', amount: 48000 },
-      ];
-    } else {
-      // Other time ranges would have different data
-      return [];
-    }
-  };
-
-  const getResearchDomainsData = () => {
-    return [
-      { name: 'AI & Machine Learning', value: 35 },
-      { name: 'Data Science', value: 25 },
-      { name: 'Cybersecurity', value: 20 },
-      { name: 'Cloud Computing', value: 15 },
-      { name: 'Other', value: 5 },
-    ];
-  };
-
-  const getSupervisorLoadData = () => {
-    return [
-      { name: 'Dr. Smith', current: 4, max: 5, utilization: 80 },
-      { name: 'Dr. Johnson', current: 3, max: 6, utilization: 50 },
-      { name: 'Dr. Williams', current: 5, max: 5, utilization: 100 },
-      { name: 'Dr. Brown', current: 2, max: 5, utilization: 40 },
-      { name: 'Dr. Davis', current: 4, max: 5, utilization: 80 },
-    ];
-  };
-
-  const getRejectionReasonsData = () => {
-    return [
-      { reason: 'Incomplete Documentation', count: 15 },
-      { reason: 'Insufficient Justification', count: 12 },
-      { reason: 'Budget Mismatch', count: 8 },
-      { reason: 'Scope Too Broad', count: 6 },
-      { reason: 'Methodology Issues', count: 4 },
-    ];
-  };
-
-  const getStudentProgressData = () => {
-    return [
-      { name: 'John Smith', progress: 85, months: 12, expected: 36 },
-      { name: 'Emily Chen', progress: 45, months: 8, expected: 24 },
-      { name: 'Michael Brown', progress: 65, months: 24, expected: 48 },
-      { name: 'Sarah Johnson', progress: 30, months: 6, expected: 36 },
-      { name: 'David Kim', progress: 90, months: 30, expected: 36 },
-    ];
-  };
-
-  const getPublicationTrendsData = () => {
-    return [
-      { year: '2019', publications: 12, citations: 45 },
-      { year: '2020', publications: 18, citations: 78 },
-      { year: '2021', publications: 24, citations: 112 },
-      { year: '2022', publications: 32, citations: 198 },
-      { year: '2023', publications: 28, citations: 145 },
-    ];
-  };
+  // No mock data generation functions
 
   const COLORS = ['#0d6efd', '#198754', '#ffc107', '#0dcaf0', '#6c757d'];
 
@@ -389,26 +302,7 @@ const AnalyticsReports = () => {
                 <Download />
               </Button>
             </div>
-            <div className="text-center mb-4">
-              <div className="display-4 fw-bold text-primary">
-                1,245
-              </div>
-              <div className="text-muted">Total Citations</div>
-            </div>
-            <div className="row text-center">
-              <div className="col-4">
-                <div className="h4 mb-1">24</div>
-                <div className="small text-muted">h-index</div>
-              </div>
-              <div className="col-4">
-                <div className="h4 mb-1">1.8</div>
-                <div className="small text-muted">Citations/Paper</div>
-              </div>
-              <div className="col-4">
-                <div className="h4 mb-1">87%</div>
-                <div className="small text-muted">Collaboration Rate</div>
-              </div>
-            </div>
+            <div className="text-center mb-4 text-muted">No research impact data available.</div>
             
             <div className="mt-4">
               <h6>Top Research Areas</h6>
@@ -425,6 +319,9 @@ const AnalyticsReports = () => {
                   />
                 </div>
               ))}
+              {reportData.researchDomains.length === 0 && (
+                <div className="text-muted">No domain breakdown available.</div>
+              )}
             </div>
           </Card.Body>
         </Card>
@@ -453,13 +350,7 @@ const AnalyticsReports = () => {
             <div style={{ height: '400px' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={[
-                    { name: 'Personnel', allocated: 650000, used: 520000 },
-                    { name: 'Equipment', allocated: 200000, used: 185000 },
-                    { name: 'Travel', allocated: 80000, used: 45000 },
-                    { name: 'Materials', allocated: 50000, used: 32000 },
-                    { name: 'Other', allocated: 20000, used: 12000 },
-                  ]}
+                  data={[]}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
@@ -485,75 +376,7 @@ const AnalyticsReports = () => {
                 <Download />
               </Button>
             </div>
-            
-            <div className="mb-4">
-              <div className="d-flex justify-content-between mb-2">
-                <span>Total Budget</span>
-                <span className="fw-semibold">$1,000,000</span>
-              </div>
-              <div className="d-flex justify-content-between mb-2">
-                <span>Allocated</span>
-                <span className="fw-semibold">$794,000</span>
-              </div>
-              <div className="d-flex justify-content-between mb-2">
-                <span>Remaining</span>
-                <span className="fw-semibold text-success">$206,000</span>
-              </div>
-              <ProgressBar 
-                now={79.4} 
-                variant={79.4 > 80 ? 'danger' : 'success'} 
-                className="mt-2" 
-                style={{ height: '8px' }} 
-                label={`${79.4}%`}
-              />
-            </div>
-            
-            <h6 className="mb-3">Top Funded Projects</h6>
-            <ListGroup variant="flush" className="mb-3">
-              <ListGroup.Item className="d-flex justify-content-between align-items-center">
-                <div className="me-3">
-                  <div className="fw-semibold">AI in Healthcare</div>
-                  <small className="text-muted">Dr. Emily Chen</small>
-                </div>
-                <span className="badge bg-primary rounded-pill">$250,000</span>
-              </ListGroup.Item>
-              <ListGroup.Item className="d-flex justify-content-between align-items-center">
-                <div className="me-3">
-                  <div className="fw-semibold">Quantum Computing</div>
-                  <small className="text-muted">Dr. Robert Johnson</small>
-                </div>
-                <span className="badge bg-primary rounded-pill">$180,000</span>
-              </ListGroup.Item>
-              <ListGroup.Item className="d-flex justify-content-between align-items-center">
-                <div className="me-3">
-                  <div className="fw-semibold">Cybersecurity</div>
-                  <small className="text-muted">Dr. Sarah Williams</small>
-                </div>
-                <span className="badge bg-primary rounded-pill">$150,000</span>
-              </ListGroup.Item>
-            </ListGroup>
-            
-            <div className="mt-4">
-              <h6>Funding Sources</h6>
-              <div className="mt-3">
-                <div className="d-flex justify-content-between mb-2">
-                  <span>Government Grants</span>
-                  <span className="fw-semibold">45%</span>
-                </div>
-                <div className="d-flex justify-content-between mb-2">
-                  <span>Industry Partners</span>
-                  <span className="fw-semibold">30%</span>
-                </div>
-                <div className="d-flex justify-content-between mb-2">
-                  <span>University Funds</span>
-                  <span className="fw-semibold">15%</span>
-                </div>
-                <div className="d-flex justify-content-between">
-                  <span>Other</span>
-                  <span className="fw-semibold">10%</span>
-                </div>
-              </div>
-            </div>
+            <div className="text-muted">No financial summary available.</div>
           </Card.Body>
         </Card>
       </Col>

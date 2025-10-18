@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+
 import { 
   Container, 
   Row, 
@@ -52,99 +53,24 @@ const AdminDashboard = ({ auth, setAuth }) => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [notificationsCount, setNotificationsCount] = useState(0);
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
   // Navigation items for Ministry Admin
   const navItems = [
     { id: 'dashboard', icon: <HouseDoor size={20} />, label: 'Dashboard' },
-    { id: 'supervisors', icon: <People size={20} />, label: 'Supervisor Approvals', badge: 5 },
+    { id: 'supervisors', icon: <People size={20} />, label: 'Supervisor Approvals' },
     { id: 'proposals', icon: <FileEarmarkText size={20} />, label: 'Research Management' },
-    { id: 'funding', icon: <CurrencyDollar size={20} />, label: 'Funding Review', badge: 12 },
+    { id: 'funding', icon: <CurrencyDollar size={20} />, label: 'Funding Review' },
     { id: 'reports', icon: <GraphUp size={20} />, label: 'Analytics & Reports' },
   ];
 
-  // Stats data for Ministry Dashboard
-  const stats = [
-    { 
-      title: 'Pending Supervisor Approvals', 
-      value: '17', 
-      change: '+3', 
-      trend: 'up',
-      icon: <People size={24} className="text-warning" />,
-      link: '#supervisors',
-      onClick: () => navigate('/admin/supervisors')
-    },
-    { 
-      title: 'Proposals for Review', 
-      value: '24', 
-      change: '+8', 
-      trend: 'up',
-      icon: <FileEarmarkText size={24} className="text-info" />,
-      link: '#proposals',
-      onClick: () => navigate('/admin/proposals')
-    },
-    { 
-      title: 'Funding Requests', 
-      value: '12', 
-      change: '-4', 
-      trend: 'down',
-      icon: <CurrencyDollar size={24} className="text-primary" />,
-      link: '#funding',
-      onClick: () => navigate('/admin/funding')
-    },
-    { 
-      title: 'Supervision Slots Used', 
-      value: '84%', 
-      change: '+5%', 
-      trend: 'up',
-      icon: <People size={24} className="text-success" />,
-      progress: 84
-    },
-  ];
+  // Stats data for Ministry Dashboard (no mock data)
+  const [stats, setStats] = useState([]);
 
-  // Recent activities for Ministry Dashboard
-  const activities = [
-    { 
-      id: 1, 
-      user: 'Dr. Sarah Johnson', 
-      action: 'applied for supervisor role', 
-      time: '15 min ago', 
-      type: 'approval',
-      status: 'pending',
-      onClick: () => navigate('/admin/supervisors')
-    },
-    { 
-      id: 2, 
-      user: 'Research Team Alpha', 
-      action: 'submitted proposal for funding', 
-      details: 'AI in Healthcare', 
-      time: '1 hour ago', 
-      type: 'proposal',
-      status: 'review',
-      onClick: () => navigate('/admin/proposals')
-    },
-    { 
-      id: 3, 
-      user: 'Dr. Michael Chen', 
-      action: 'reached 90% supervision capacity', 
-      time: '3 hours ago', 
-      type: 'alert',
-      status: 'warning',
-      onClick: () => navigate('/admin/allocations')
-    },
-    { 
-      id: 4, 
-      user: 'Funding Committee', 
-      action: 'approved funding for', 
-      details: 'Renewable Energy Project', 
-      amount: 'LKR 15,000',
-      time: '1 day ago', 
-      type: 'funding',
-      status: 'approved',
-      onClick: () => navigate('/admin/funding')
-    },
-  ];
+  // Recent activities for Ministry Dashboard (no mock data)
+  const [activities, setActivities] = useState([]);
 
   // Quick actions for Ministry Admin
   const quickActions = [
@@ -178,30 +104,7 @@ const AdminDashboard = ({ auth, setAuth }) => {
     },
   ];
 
-  // System stats for Ministry Dashboard
-  const systemStats = [
-    { 
-      title: 'Supervisor Capacity', 
-      value: '78%', 
-      progress: 78, 
-      variant: 'warning',
-      onClick: () => navigate('/admin/allocations')
-    },
-    { 
-      title: 'Funding Utilization', 
-      value: '65%', 
-      progress: 65, 
-      variant: 'info',
-      onClick: () => navigate('/admin/funding')
-    },
-    { 
-      title: 'Proposal Review Time', 
-      value: '3.2 days', 
-      progress: 68, 
-      variant: 'success',
-      onClick: () => navigate('/admin/proposals')
-    },
-  ];
+  // No mock system stats
 
   const handleStatClick = (stat) => {
     if (stat.onClick) {
@@ -334,10 +237,13 @@ const AdminDashboard = ({ auth, setAuth }) => {
             </div>
             <Button variant="light" className="rounded-circle p-2 me-2 position-relative">
               <Bell size={20} />
-              <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                3
-              </span>
+              {notificationsCount > 0 && (
+                <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                  {notificationsCount}
+                </span>
+              )}
             </Button>
+
             <Button variant="light" className="rounded-circle p-2 me-2">
               <Envelope size={20} />
             </Button>
@@ -552,32 +458,11 @@ const AdminDashboard = ({ auth, setAuth }) => {
                 {/* System Status */}
                 <Card className="border-0 shadow-sm">
                   <Card.Header className="bg-white border-0">
-                    <h5 className="mb-0">Supervision Capacity</h5>
+                    <h5 className="mb-0">System Status</h5>
                   </Card.Header>
                   <Card.Body>
-                    <div className="mb-3">
-                      <div className="d-flex justify-content-between mb-1">
-                        <span>Supervisor Capacity</span>
-                        <span>84% Used</span>
-                      </div>
-                      <ProgressBar now={84} variant={84 > 80 ? 'danger' : 'primary'} style={{ height: '8px', borderRadius: '4px' }} />
-                      <small className="text-muted">High: Dr. Smith (92%)</small>
-                    </div>
-                    <div className="mb-3">
-                      <div className="d-flex justify-content-between mb-1">
-                        <span>Funding Utilization</span>
-                        <span>68% Allocated</span>
-                      </div>
-                      <ProgressBar now={68} variant="info" style={{ height: '8px', borderRadius: '4px' }} />
-                      <small className="text-muted">LKR 245,000 remaining</small>
-                    </div>
-                    <div>
-                      <div className="d-flex justify-content-between mb-1">
-                        <span>Proposal Review Time</span>
-                        <span>3.2 days</span>
-                      </div>
-                      <ProgressBar now={65} variant="success" style={{ height: '8px', borderRadius: '4px' }} />
-                      <small className="text-muted">Target: 5 days</small>
+                    <div className="text-center text-muted py-2">
+                      No system metrics available.
                     </div>
                   </Card.Body>
                 </Card>

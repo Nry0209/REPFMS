@@ -111,33 +111,31 @@ const AdminAuth = ({ setAuth }) => {
     setMessage("");
 
     try {
-      // Hardcoded admin credentials
-      if (formData.email === 'admin@example.com' && formData.password === 'admin123') {
-        const mockAdminData = {
-          token: 'mock-admin-token',
-          name: 'Admin User',
-          email: 'admin@example.com',
-          role: 'admin'
-        };
+      const res = await fetch("http://localhost:5000/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email, password: formData.password }),
+      });
 
-        localStorage.setItem("adminToken", mockAdminData.token);
-        localStorage.setItem("adminInfo", JSON.stringify(mockAdminData));
+      const data = await res.json();
 
-        setAuth({
-          supervisor: false,
-          supervisorId: null,
-          admin: true,
-          researcher: false,
-          name: mockAdminData.name,
-          email: mockAdminData.email
-        });
+      if (!res.ok) throw new Error(data.message || "Login failed");
 
-        navigate("/admin/dashboard");
-      } else {
-        throw new Error("Invalid email or password");
-      }
+      localStorage.setItem("adminToken", data.token);
+      localStorage.setItem("adminInfo", JSON.stringify(data));
+
+      setAuth({
+        supervisor: false,
+        supervisorId: null,
+        admin: true,
+        researcher: false,
+        name: data.name,
+        email: data.email,
+      });
+
+      navigate("/admin/dashboard");
     } catch (err) {
-      setMessage(err.message);
+      setMessage(err.message || "Login failed");
     }
   };
 
