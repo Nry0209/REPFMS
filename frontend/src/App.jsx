@@ -201,6 +201,10 @@ import FundingRequests from "./pages/FundingRequests";
 // Admin Pages
 import AdminAuth from "./pages/AdminAuth";
 import AdminDashboard from "./pages/AdminDashboard";
+import SupervisorApprovals from "./pages/admin/SupervisorApprovals";
+import ResearchManagement from "./pages/admin/ResearchManagement";
+import FundingReview from "./pages/admin/FundingReview";
+import AnalyticsReports from "./pages/admin/AnalyticsReports";
 
 // Researcher Pages
 import ResearcherAuth from "./pages/ResearcherAuth";
@@ -327,6 +331,30 @@ const App = () => {
           path="/admin/dashboard"
           element={
             auth.admin ? <AdminDashboard auth={auth} setAuth={setAuth} /> : <Navigate to="/admin/auth" />
+          }
+        />
+        <Route
+          path="/admin/supervisors"
+          element={
+            auth.admin ? <SupervisorApprovals auth={auth} setAuth={setAuth} /> : <Navigate to="/admin/auth" />
+          }
+        />
+        <Route
+          path="/admin/proposals"
+          element={
+            auth.admin ? <ResearchManagement auth={auth} setAuth={setAuth} /> : <Navigate to="/admin/auth" />
+          }
+        />
+        <Route
+          path="/admin/funding"
+          element={
+            auth.admin ? <FundingReview auth={auth} setAuth={setAuth} /> : <Navigate to="/admin/auth" />
+          }
+        />
+        <Route
+          path="/admin/analytics"
+          element={
+            auth.admin ? <AnalyticsReports auth={auth} setAuth={setAuth} /> : <Navigate to="/admin/auth" />
           }
         />
 

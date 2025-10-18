@@ -12,6 +12,8 @@ import researcherRoutes from "./routes/researcherRoutes.js";
 import supervisionRoutes from "./routes/supervisionRoutes.js";
 import ministryRoutes from "./routes/ministryRoutes.js";
 import fundingRoutes from "./routes/fundingRoutes.js";
+import researchRoutes from "./routes/researchRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -94,6 +96,8 @@ app.use("/api/researchers", researcherRoutes);
 app.use("/api/supervisions", supervisionRoutes);
 app.use("/api/ministry", ministryRoutes);
 app.use("/api/funding", fundingRoutes);
+app.use("/api/researches", researchRoutes);
+app.use("/api/admin", adminRoutes);
 
 // ✅ Global Error Handling
 app.use((error, req, res, next) => {

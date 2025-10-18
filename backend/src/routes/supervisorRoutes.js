@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 import Supervisor from "../models/Supervisor.js";
 import { protect } from "../middlewares/authMiddleware.js";
-import { getSupervisorProfile, updateSupervisorProfile } from "../controllers/supervisorController.js";
+import { getSupervisorProfile, updateSupervisorProfile, getAllSupervisors } from "../controllers/supervisorController.js";
 
 const router = express.Router();
 
@@ -82,6 +82,9 @@ const generateToken = (supervisor) =>
     process.env.JWT_SECRET,
     { expiresIn: "24h" }
   );
+
+// ---------- Public Routes ----------
+router.get('/list', getAllSupervisors);
 
 // ---------- Register ----------
 router.post("/register", uploadFields, async (req, res) => {
