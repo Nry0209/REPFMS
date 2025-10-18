@@ -210,6 +210,7 @@ import AnalyticsReports from "./pages/admin/AnalyticsReports";
 import ResearcherAuth from "./pages/ResearcherAuth";
 import ResearcherDashboard from "./pages/ResearcherDashboard";
 import ResearcherProfile from "./pages/ResearcherProfile";
+import ResearchView from "./pages/ResearchView";
 
 const App = () => {
   const [auth, setAuth] = useState({
@@ -322,6 +323,16 @@ const App = () => {
           path="/researcher/profile"
           element={
             auth.researcher ? <ResearcherProfile auth={auth} setAuth={setAuth} /> : <Navigate to="/researcher/auth?mode=login" />
+          }
+        />
+        <Route
+          path="/researcher/research/:id"
+          element={
+            auth.researcher ? (
+              <ResearchView />
+            ) : (
+              <Navigate to="/researcher/auth?mode=login" />
+            )
           }
         />
 

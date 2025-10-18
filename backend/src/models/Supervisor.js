@@ -129,6 +129,8 @@ const supervisorSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    googleScholar: { type: String, trim: true },
+    scopus: { type: String, trim: true },
 
     // ✅ Supervision data
     supervisions: {

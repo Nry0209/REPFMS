@@ -50,7 +50,7 @@
 //               </div>
 //             </div>
 
-//             <style jsx>{`
+//             <style>
 //               .search-container {
 //                 opacity: 0;
 //                 visibility: hidden;
@@ -60,7 +60,7 @@
 //                 opacity: 1;
 //                 visibility: visible;
 //               }
-//             `}</style>
+//             </style>
 //           </div>
 
 //           {/* Right */}

@@ -12,6 +12,11 @@ const researchSchema = new mongoose.Schema(
       required: true,
       trim: true
     },
+    // Optional: path or URL to the research paper file
+    paperUrl: {
+      type: String,
+      trim: true
+    },
     domains: {
       type: [String],
       required: true,

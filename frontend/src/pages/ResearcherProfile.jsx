@@ -791,6 +791,8 @@ const ResearcherProfile = () => {
   const [awardsInput, setAwardsInput] = useState("");
   const [qualsEdit, setQualsEdit] = useState(false);
   const [qualsInput, setQualsInput] = useState("");
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -842,6 +844,29 @@ const ResearcherProfile = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      setDeleting(true);
+      setError("");
+      const token = localStorage.getItem("researcherToken");
+      if (!token) throw new Error("Not authorized");
+      const res = await fetch("http://localhost:5000/api/researchers/profile", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) throw new Error(data?.message || "Failed to delete profile");
+      localStorage.removeItem("researcherToken");
+      localStorage.removeItem("researcherInfo");
+      setShowDelete(false);
+      navigate("/researcher/auth");
+    } catch (e) {
+      setError(e.message || "Failed to delete profile");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -1509,6 +1534,18 @@ const ResearcherProfile = () => {
                     )}
                   </Card.Body>
                 </Card>
+                {/* Danger Zone */}
+                <Card className="shadow mb-3">
+                  <Card.Header className="bg-white d-flex justify-content-between align-items-center">
+                    <h6 className="mb-0 text-danger">Danger Zone</h6>
+                  </Card.Header>
+                  <Card.Body>
+                    <p className="text-muted mb-2" style={{fontSize: 14}}>This action will permanently delete your profile and associated data.</p>
+                    <Button variant="danger" onClick={() => setShowDelete(true)}>
+                      Delete Profile
+                    </Button>
+                  </Card.Body>
+                </Card>
 
                 <Card className="shadow">
                   <Card.Header className="bg-light">
@@ -1544,9 +1581,22 @@ const ResearcherProfile = () => {
           </Col>
         </Row>
       </Container>
+      <Modal show={showDelete} onHide={() => setShowDelete(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Delete Profile</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          Are you sure you want to delete your profile? This cannot be undone.
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDelete(false)} disabled={deleting}>Cancel</Button>
+          <Button variant="danger" onClick={handleConfirmDelete} disabled={deleting}>
+            {deleting ? "Deleting..." : "Delete"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
       <DashboardFooter/>
     </>
   );
-};
-
+}
 export default ResearcherProfile;
