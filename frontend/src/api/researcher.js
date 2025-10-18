@@ -48,7 +48,7 @@ export async function getResearcherUploads(researchId) {
 }
 
 export async function getSupervisorsByDomain(domains = []) {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('researcherToken');
   const query = domains.length ? `?domains=${encodeURIComponent(domains.join(','))}` : '';
   const res = await fetch(`http://localhost:5000/api/researchers/supervisors/by-domains${query}`, {
     headers: {
@@ -61,7 +61,7 @@ export async function getSupervisorsByDomain(domains = []) {
 }
 
 export async function requestSupervision(researchId, supervisor) {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('researcherToken');
   const res = await fetch(`http://localhost:5000/api/researchers/research/${researchId}/request-supervision`, {
     method: 'POST',
     headers: {
@@ -90,7 +90,7 @@ export async function submitFundingRequest(researchId, file) {
 
 // Helper to get a fake research by id (title + domains)
 export async function getResearchById(id) {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('researcherToken');
   const res = await fetch(`http://localhost:5000/api/researchers/research/${id}`, {
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

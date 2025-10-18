@@ -46,18 +46,26 @@
 //   } catch (err) {
 //     return res.status(401).json({ message: "Invalid token" });
 //   }
+//   cb(new Error("Only PDF and DOC files are allowed"));
 // };
 
-// // ✅ Researcher Login
-// router.post("/login", async (req, res) => {
-//   try {
-//     const { email, password } = req.body;
-//     const researcher = await Researcher.findOne({ email }).populate("researches");
+// const upload = multer({ 
+//   storage,
+//   fileFilter,
+//   limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+// });
 
-//     if (!researcher)
-//       return res.status(400).json({ message: "Invalid credentials" });
+// // ✅ JWT helper
+// const generateToken = (id) =>
+//   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
-//     const isMatch = await bcrypt.compare(password, researcher.password);
+// // ✅ Middleware to verify token
+// const verifyToken = (req, res, next) => {
+//   const authHeader = req.header("Authorization");
+//   if (!authHeader)
+//     return res.status(401).json({ 
+//       success: false,
+//       message: "No token provided" 
 //     if (!isMatch)
 //       return res.status(400).json({ message: "Invalid credentials" });
 
@@ -226,7 +234,9 @@
 //       });
 //     }
 
-//     const researcher = await Researcher.findOne({ email }).populate("researches");
+//     const researcher = await Researcher.findOne({ email })
+//       .select('+password')
+//       .populate("researches");
 
 //     if (!researcher)
 //       return res.status(401).json({ 
@@ -703,7 +713,9 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    const researcher = await Researcher.findOne({ email }).populate("researches");
+    const researcher = await Researcher.findOne({ email })
+      .select('+password')
+      .populate("researches");
 
     if (!researcher)
       return res.status(401).json({ 
