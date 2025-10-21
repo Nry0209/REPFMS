@@ -34,6 +34,19 @@ const FundingRequestSchema = new mongoose.Schema(
       enum: ['pending', 'approved', 'rejected'],
       default: 'pending'
     },
+    // Supervisor validation before ministry approval
+    validatedBySupervisor: {
+      type: Boolean,
+      default: false,
+    },
+    supervisorValidationNote: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    supervisorValidatedAt: {
+      type: Date,
+    },
     budgetBreakdown: {
       personnel: { type: Number, default: 0 },
       equipment: { type: Number, default: 0 },

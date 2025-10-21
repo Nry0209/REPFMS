@@ -63,10 +63,10 @@ const AdminDashboard = ({ auth, setAuth }) => {
     },
     { 
       id: 4, 
-      title: 'Manage Allocations', 
+      title: 'Verify Domains', 
       icon: <People size={24} />, 
       variant: 'warning',
-      onClick: () => navigate('/admin/allocations')
+      onClick: () => navigate('/admin/verification')
     },
   ];
 
@@ -88,13 +88,13 @@ const AdminDashboard = ({ auth, setAuth }) => {
     }
   };
 
-  const handleQuickAction = (action) => {
-    if (action.onClick) {
-      action.onClick();
-    } else {
-      console.log(`Action clicked: ${action.title}`);
-    }
-  };
+  // const handleQuickAction = (action) => {
+  //   if (action.onClick) {
+  //     action.onClick();
+  //   } else {
+  //     console.log(`Action clicked: ${action.title}`);
+  //   }
+  // };
 
   return (
     <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>

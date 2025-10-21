@@ -190,6 +190,7 @@ import SupervisorApprovals from "./pages/admin/SupervisorApprovals";
 import ResearchManagement from "./pages/admin/ResearchManagement";
 import FundingReview from "./pages/admin/FundingReview";
 import AnalyticsReports from "./pages/admin/AnalyticsReports";
+import DomainVerification from "./pages/admin/DomainVerification";
 
 // Researcher Pages
 import ResearcherAuth from "./pages/ResearcherAuth";
@@ -351,6 +352,12 @@ const App = () => {
           path="/admin/funding"
           element={
             auth.admin ? <FundingReview auth={auth} setAuth={setAuth} /> : <Navigate to="/admin/auth" />
+          }
+        />
+        <Route
+          path="/admin/verification"
+          element={
+            auth.admin ? <DomainVerification /> : <Navigate to="/admin/auth" />
           }
         />
         <Route

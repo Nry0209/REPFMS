@@ -227,9 +227,9 @@ router.get("/profile", verifyToken, async (req, res) => {
   try {
     let profile;
 
-    if (req.role === "Supervisor") {
+    if (String(req.role).toLowerCase() === "supervisor") {
       profile = await Supervisor.findById(req.userId).select("-password");
-    } else if (req.role === "Researcher") {
+    } else if (String(req.role).toLowerCase() === "researcher") {
       profile = await Researcher.findById(req.userId).select("-password");
     } else {
       return res.status(403).json({ message: "Access denied" });
@@ -295,7 +295,7 @@ router.post("/request", verifyToken, async (req, res) => {
 // ------------------- Supervisor views all supervision requests -------------------
 router.get("/requests", verifyToken, async (req, res) => {
   try {
-    if (req.role !== "Supervisor")
+    if (String(req.role).toLowerCase() !== "supervisor")
       return res.status(403).json({ message: "Access denied" });
 
     const requests = await Supervision.find({ supervisor: req.userId, verifiedByMinistry: true })
@@ -409,7 +409,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
 // ------------------- Researcher views their supervision(s) -------------------
 router.get("/my-supervisions", verifyToken, async (req, res) => {
   try {
-    if (req.role !== "Researcher")
+    if (String(req.role).toLowerCase() !== "researcher")
       return res.status(403).json({ message: "Access denied" });
 
     const supervisions = await Supervision.find({ researcher: req.userId })

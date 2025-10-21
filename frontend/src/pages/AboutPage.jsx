@@ -105,7 +105,7 @@ const AboutPage = () => {
 
       {/* 🔹 About Section */}
       <Container id="about" className="py-5 text-center">
-        <h2 className="fw-bold mb-3" style={{ color: "#0d3b66" }}>About the System</h2>
+        <h2 className="fw-bold mb-3" style={{ color: "#00798c" }}>About the System</h2>
         <p className="text-muted fs-5 mx-auto" style={{ maxWidth: 900 }}>
           This system simplifies the research process at universities by integrating researcher proposal submission, supervisor evaluation, and administrative approvals.
         </p>

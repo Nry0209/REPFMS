@@ -20,6 +20,8 @@ const ResearcherDashboard = () => {
   const [supervisionByTitle, setSupervisionByTitle] = useState({}); // title -> supervision
   const [fundingMap, setFundingMap] = useState({}); // { [projectTitle]: request }
   const [fundForm, setFundForm] = useState({}); // { [researchId]: { amount, justification } }
+  const [discoverList, setDiscoverList] = useState([]); // pending projects to discover
+  const [loadingDiscover, setLoadingDiscover] = useState(false);
   // removed quick action modals; showOngoing/showCompleted no longer used
   const [toasts, setToasts] = useState([]);
   // Comments are supervisor-only; researcher dashboard shows them read-only
@@ -60,6 +62,28 @@ const ResearcherDashboard = () => {
         setSupervisionByTitle(map);
       }
     } catch (e) {}
+  };
+
+  // --- Discover pending projects by domains ---
+  const fetchDiscoverProjects = async () => {
+    try {
+      setLoadingDiscover(true);
+      const token = localStorage.getItem("researcherToken");
+      if (!token) {
+        setDiscoverList([]);
+        return;
+      }
+      const res = await fetch("http://localhost:5000/api/researchers/pending-projects", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) throw new Error(data?.message || "Failed to load discover projects");
+      setDiscoverList(Array.isArray(data.data) ? data.data : []);
+    } catch (e) {
+      setDiscoverList([]);
+    } finally {
+      setLoadingDiscover(false);
+    }
   };
 
   // ---- Supervisor discovery & request ----
@@ -163,6 +187,7 @@ const ResearcherDashboard = () => {
     fetchActiveResearch();
     fetchMySupervisions();
     fetchFundingRequests();
+    fetchDiscoverProjects();
     return () => {
       clearInterval(id);
       window.removeEventListener('pending-requests-updated', onUpdated);
@@ -559,6 +584,54 @@ const ResearcherDashboard = () => {
                         </tbody>
                       </table>
                     </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+
+            {/* Discover Projects matching domains */}
+            <Row className="mt-3">
+              <Col>
+                <Card className="shadow border-0">
+                  <Card.Header className="text-white d-flex justify-content-between align-items-center" style={{ background: 'linear-gradient(135deg, #0d3b66, #00798c)' }}>
+                    <h5 className="mb-0">Discover Projects (matching your domains)</h5>
+                    <Button size="sm" variant="light" onClick={fetchDiscoverProjects} disabled={loadingDiscover}>{loadingDiscover ? 'Loading...' : 'Refresh'}</Button>
+                  </Card.Header>
+                  <Card.Body className="p-0">
+                    {loadingDiscover ? (
+                      <div className="text-center py-4"><Spinner animation="border" /></div>
+                    ) : discoverList.length === 0 ? (
+                      <div className="text-center text-muted py-4">No matching projects found</div>
+                    ) : (
+                      <div className="table-responsive">
+                        <table className="table table-hover mb-0 align-middle">
+                          <thead>
+                            <tr>
+                              <th>Title</th>
+                              <th>Domains</th>
+                              <th>Researcher</th>
+                              <th>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {discoverList.map((r) => (
+                              <tr key={r._id}>
+                                <td>{r.title}</td>
+                                <td>
+                                  {(r.domains || []).map((d, i) => (
+                                    <Badge key={i} bg="secondary" className="me-1">{d}</Badge>
+                                  ))}
+                                </td>
+                                <td>{r.researcher?.fullName || '-'}</td>
+                                <td>
+                                  <Button size="sm" onClick={() => openSupervisors(r)}>Find Supervisors</Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </Card.Body>
                 </Card>
               </Col>

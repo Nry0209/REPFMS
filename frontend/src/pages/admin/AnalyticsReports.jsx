@@ -444,86 +444,18 @@ const AnalyticsReports = () => {
           <Card.Body>
             <div className="d-flex justify-content-between align-items-center mb-4">
               <h5 className="mb-0">Student Statistics</h5>
-              <Button variant="outline-secondary" size="sm">
+              <Button variant="outline-secondary" size="sm" disabled>
                 <Download />
               </Button>
             </div>
-            
-            <div className="row text-center mb-4">
-              <div className="col-6 mb-3">
-                <div className="p-3 bg-light rounded">
-                  <div className="h2 mb-1">124</div>
-                  <div className="text-muted small">Total Students</div>
-                </div>
-              </div>
-              <div className="col-6 mb-3">
-                <div className="p-3 bg-light rounded">
-                  <div className="h2 mb-1">24</div>
-                  <div className="text-muted small">New This Year</div>
-                </div>
-              </div>
-              <div className="col-6">
-                <div className="p-3 bg-light rounded">
-                  <div className="h2 mb-1">3.8</div>
-                  <div className="text-muted small">Avg. GPA</div>
-                </div>
-              </div>
-              <div className="col-6">
-                <div className="p-3 bg-light rounded">
-                  <div className="h2 mb-1">92%</div>
-                  <div className="text-muted small">Retention Rate</div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="mb-4">
+            <div className="text-muted">No student statistics available.</div>
+            <div className="mt-4">
               <h6>Program Distribution</h6>
-              <div style={{ height: '200px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: 'PhD', value: 45 },
-                        { name: 'MSc', value: 55 },
-                        { name: 'MPhil', value: 24 }
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={70}
-                      fill="#8884d8"
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      <Cell fill="#0d6efd" />
-                      <Cell fill="#198754" />
-                      <Cell fill="#ffc107" />
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              <div className="text-muted">No program distribution data available.</div>
             </div>
-            
-            <div>
+            <div className="mt-4">
               <h6>Upcoming Milestones</h6>
-              <ListGroup variant="flush">
-                <ListGroup.Item className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <div className="fw-semibold">Thesis Defense</div>
-                    <small className="text-muted">John Smith - May 15, 2023</small>
-                  </div>
-                  <Badge bg="primary">PhD</Badge>
-                </ListGroup.Item>
-                <ListGroup.Item className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <div className="fw-semibold">Proposal Defense</div>
-                    <small className="text-muted">Emily Chen - June 2, 2023</small>
-                  </div>
-                  <Badge bg="success">MSc</Badge>
-                </ListGroup.Item>
-              </ListGroup>
+              <div className="text-muted">No upcoming milestones available.</div>
             </div>
           </Card.Body>
         </Card>

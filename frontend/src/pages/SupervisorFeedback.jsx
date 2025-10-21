@@ -327,7 +327,7 @@ const SupervisorFeedback = ({ auth, setAuth }) => {
         style={{
           width: "280px",
           minHeight: "100vh",
-          backgroundColor: "#0d3b66",
+          backgroundColor: "#00798c",
           borderRight: "1px solid #e2e8f0",
           boxShadow: "2px 0 10px rgba(0,0,0,0.05)",
           overflow: "hidden",

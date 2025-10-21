@@ -650,9 +650,9 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB
 });
 
-// ✅ JWT helper
+// ✅ JWT helper (include role for downstream auth checks)
 const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+  jwt.sign({ id, role: 'researcher' }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
 // ✅ Middleware to verify token
 const verifyToken = (req, res, next) => {

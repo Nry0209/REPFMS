@@ -88,6 +88,7 @@
 
 // src/pages/AdminAuth.jsx
 // src/pages/AdminAuth.jsx
+
 import React, { useState } from "react";
 import { Form, Button, Container, Row, Col, Card, Modal } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
@@ -205,10 +206,10 @@ const AdminAuth = ({ setAuth }) => {
           <Card className="shadow border-0 rounded-4">
             <Card.Body className="p-4 p-md-5">
               <div className="mb-3">
-                <div className="d-inline-flex align-items-center justify-content-center rounded-circle" style={{ width: 56, height: 56, background: "linear-gradient(135deg, #005C97, #363795)" }}>
+                <div className="d-inline-flex align-items-center justify-content-center rounded-circle" style={{ width: 56, height: 56, background: "linear-gradient(135deg, #0d3b66, #00798c)" }}>
                   <Lock size={28} color="#fff" />
                 </div>
-                <h3 className="fw-bold mt-3 mb-1" style={{ color: "#004a88" }}>Admin Login</h3>
+                <h3 className="fw-bold mt-3 mb-1" style={{ color: "#0d3b66" }}>Admin Login</h3>
                 <div className="text-muted">Access system management and approvals</div>
               </div>
               {message && <Message variant="danger">{message}</Message>}
@@ -225,9 +226,16 @@ const AdminAuth = ({ setAuth }) => {
                   <Button variant="link" type="button" onClick={openForgot} className="p-0" style={{ color: "#00798c" }}>Forgot password?</Button>
                 </div>
                 <div className="d-grid">
-                  <Button type="submit" size="lg" className="fw-bold" style={{ background: "linear-gradient(90deg, #4c6ef5, #22c1c3)", border: "none", borderRadius: "0.8rem", padding: "0.8rem" }}>
+                  <Button type="submit" size="lg" className="fw-bold" style={{ background: "linear-gradient(135deg, #0d3b66, #00798c)", border: "none", borderRadius: "0.8rem", padding: "0.8rem" }}>
                     Sign In
                   </Button>
+                </div>
+                <div className="text-center mt-3">
+                  <small className="text-muted">Sign in as a different role:</small>
+                  <div className="d-flex justify-content-center gap-3 mt-2">
+                    <Button variant="link" onClick={() => navigate('/researcher/auth?mode=login')} className="p-0">Researcher</Button>
+                    <Button variant="link" onClick={() => navigate('/supervisor/auth?mode=login')} className="p-0">Supervisor</Button>
+                  </div>
                 </div>
               </Form>
               <p className="text-center mt-3 text-muted">For access issues, contact the system administrator.</p>

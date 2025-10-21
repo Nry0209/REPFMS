@@ -482,7 +482,8 @@ const researchersData = [
     transcripts: {
       "PhD in AI": "uploads/researcher/transcripts/transcript-alice-phd.pdf",
     },
-    profileImage: "uploads/researcher/profile/alice.jpg",
+    department: "Computer Science",
+    profilePhoto: "uploads/researcher/profile/alice.jpg",
     skills: ["Artificial Intelligence", "Machine Learning", "Data Analysis"],
     awards: ["Best Researcher 2023", "AI Innovation Grant"],
     researches: [
@@ -516,7 +517,8 @@ const researchersData = [
     transcripts: {
       "PhD in Biotechnology": "uploads/researcher/transcripts/transcript-bob-phd.pdf",
     },
-    profileImage: "uploads/researcher/profile/bob.jpg",
+    department: "Biotechnology",
+    profilePhoto: "uploads/researcher/profile/bob.jpg",
     skills: ["Genetic Engineering", "Lab Research", "Medical Biotechnology"],
     awards: ["Biotech Excellence Award"],
     researches: [
@@ -549,7 +551,8 @@ const researchersData = [
     transcripts: {
       "PhD in Agriculture": "uploads/researcher/transcripts/transcript-clara-phd.pdf",
     },
-    profileImage: "uploads/researcher/profile/clara.jpg",
+    department: "Agricultural Sciences",
+    profilePhoto: "uploads/researcher/profile/clara.jpg",
     skills: ["Crop Science", "Soil Analysis", "Sustainable Agriculture"],
     awards: ["Agriculture Research Fellowship"],
     researches: [
@@ -583,7 +586,8 @@ const researchersData = [
     transcripts: {
       "PhD in Renewable Energy": "uploads/researcher/transcripts/transcript-david-phd.pdf",
     },
-    profileImage: "uploads/researcher/profile/david.jpg",
+    department: "Energy Engineering",
+    profilePhoto: "uploads/researcher/profile/david.jpg",
     skills: ["Renewable Systems", "Smart Grids", "Solar Energy"],
     awards: ["Green Tech Research Award"],
     researches: [
@@ -616,7 +620,8 @@ const researchersData = [
     transcripts: {
       "PhD in Environmental Science": "uploads/researcher/transcripts/transcript-emma-phd.pdf",
     },
-    profileImage: "uploads/researcher/profile/emma.jpg",
+    department: "Environmental Science",
+    profilePhoto: "uploads/researcher/profile/emma.jpg",
     skills: ["Climate Modeling", "Sustainability", "Ecosystem Studies"],
     awards: ["Climate Science Excellence Medal"],
     researches: [
@@ -657,7 +662,8 @@ const seedResearchers = async () => {
         scopus: r.scopus,
         googleScholar: r.googleScholar,
         transcripts: r.transcripts,
-        profileImage: r.profileImage,
+        department: r.department,
+        profilePhoto: r.profilePhoto,
         skills: r.skills,
         awards: r.awards,
         researches: [],
@@ -693,5 +699,4 @@ const seedResearchers = async () => {
   }
 };
 
-// Seeding is disabled by default. To seed manually, uncomment the line below.
-// seedResearchers();
+seedResearchers();

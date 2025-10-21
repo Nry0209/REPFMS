@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import FundingRequest from '../models/FundingRequest.js';
 import Researcher from '../models/Researcher.js';
 import Supervisor from '../models/Supervisor.js';
+import Supervision from '../models/Supervision.js';
 
 const router = express.Router();
 
@@ -20,6 +21,54 @@ router.get('/', async (req, res) => {
         message: 'Database connection error',
         error: 'Database not connected'
       });
+
+// @desc    Supervisor validates/invalidates a funding request (pre-approval gate)
+// @route   PATCH /api/funding/:id/supervisor-validate
+// @access  Private/Supervisor (NOTE: add auth middleware when available)
+router.patch('/:id/supervisor-validate', async (req, res) => {
+  try {
+    const { validated, note } = req.body || {};
+    const fr = await FundingRequest.findById(req.params.id);
+    if (!fr) return res.status(404).json({ message: 'Funding request not found' });
+
+    fr.validatedBySupervisor = !!validated;
+    fr.supervisorValidationNote = note || '';
+    fr.supervisorValidatedAt = new Date();
+    await fr.save();
+
+    const populated = await FundingRequest.findById(req.params.id)
+      .populate('researcher', 'fullName email')
+      .populate('supervisor', 'name email');
+    return res.json({ success: true, data: populated });
+  } catch (error) {
+    console.error('Supervisor validate funding error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+  // @desc    Supervisor validates/invalidates a funding request (pre-approval gate)
+  // @route   PATCH /api/funding/:id/supervisor-validate
+  // @access  Private/Supervisor (NOTE: add auth middleware when available)
+  router.patch('/:id/supervisor-validate', async (req, res) => {
+    try {
+      const { validated, note } = req.body || {};
+      const fr = await FundingRequest.findById(req.params.id);
+      if (!fr) return res.status(404).json({ message: 'Funding request not found' });
+
+      fr.validatedBySupervisor = !!validated;
+      fr.supervisorValidationNote = note || '';
+      fr.supervisorValidatedAt = new Date();
+      await fr.save();
+
+      const populated = await FundingRequest.findById(req.params.id)
+        .populate('researcher', 'fullName email')
+        .populate('supervisor', 'name email');
+      return res.json({ success: true, data: populated });
+    } catch (error) {
+      console.error('Supervisor validate funding error:', error);
+      return res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
     }
 
     console.log('Database connection status:', mongoose.connection.readyState);
@@ -89,7 +138,7 @@ router.patch('/status/:id', async (req, res) => {
   session.startTransaction();
   
   try {
-    const { status, recommendedAmount } = req.body;
+    const { status, recommendedAmount, override, overrideReason } = req.body;
     
     // Validate status
     if (!['approved', 'rejected', 'pending'].includes(status)) {
@@ -107,6 +156,23 @@ router.patch('/status/:id', async (req, res) => {
       return res.status(404).json({ message: 'Funding request not found' });
     }
     
+    // If approving, ensure supervisor validated unless override
+    if (status === 'approved') {
+      if (!request.validatedBySupervisor && !override) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ message: 'Supervisor validation required before approval. Provide override with reason to proceed.' });
+      }
+      if (!request.validatedBySupervisor && override && !overrideReason) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ message: 'Override reason is required when bypassing supervisor validation.' });
+      }
+      if (override && overrideReason) {
+        request.rejectionReason = `Override: ${overrideReason}`;
+      }
+    }
+
     // Update status and recommended amount if provided
     request.status = status;
     if (recommendedAmount !== undefined) {
@@ -191,6 +257,25 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
 
+    // Server-side preconditions: ensure supervision is Finished and Feasible
+    const supervision = await Supervision.findOne({
+      researcher: researcherId,
+      supervisor: supervisorId,
+      projectTitle: projectTitle,
+    });
+
+    if (!supervision) {
+      return res.status(400).json({ message: 'No supervision found for this researcher, supervisor and project title' });
+    }
+
+    if (supervision.status !== 'Finished' || supervision.feasibility !== 'Feasible') {
+      return res.status(400).json({ message: 'Funding allowed only for Finished and Feasible supervisions' });
+    }
+
+    if (supervision.fundingRequested) {
+      return res.status(409).json({ message: 'Funding already requested for this supervision' });
+    }
+
     const newRequest = new FundingRequest({
       projectTitle,
       researcher: researcherId,
@@ -211,6 +296,9 @@ router.post('/', async (req, res) => {
     });
 
     const createdRequest = await newRequest.save();
+    // Mark supervision as fundingRequested to prevent duplicates
+    supervision.fundingRequested = true;
+    await supervision.save();
     
     // Populate the response with basic details
     const response = createdRequest.toObject();

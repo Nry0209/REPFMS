@@ -50,6 +50,12 @@ const supervisorSchema = new mongoose.Schema(
     domains: {
       type: [String],
       default: [],
+      validate: {
+        validator: function (arr) {
+          return Array.isArray(arr) && arr.length > 0 && arr.length <= 3;
+        },
+        message: "You must select between 1 and 3 domains",
+      },
     },
     studies: {
       type: [String],
