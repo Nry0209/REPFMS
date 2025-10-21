@@ -1,640 +1,448 @@
-import React, { useState, useEffect } from "react";
-import {CheckCircle,XCircle,Clock,Award,TrendingUp,FileText,BarChart3,
-} from "lucide-react";
-import DashboardHeader from "../components/layout/DashboardHeader";
-import DashboardFooter from "../components/layout/DashboardFooter";
+import React, { useState, useEffect } from 'react';
+import { Row, Col, Card, Button, Nav, Badge } from 'react-bootstrap';
+import {
+  HouseDoor,
+  FileEarmarkText,
+  PersonCircle,
+  FileEarmark,
+  LayoutSidebar,
+  BoxArrowRight
+} from 'react-bootstrap-icons';
+import { useNavigate } from 'react-router-dom';
 
-const SupervisorDashboard = ({ auth }) => {
+const SupervisorDashboard = ({ auth, setAuth }) => {
   const [requests, setRequests] = useState([]);
   const [feedbackText, setFeedbackText] = useState({});
+  const [fundingStatus, setFundingStatus] = useState({});
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const toggleSidebar = () => setSidebarOpen((s) => !s);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchRequests = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const res = await fetch("http://localhost:5000/api/supervision/requests", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        const token = localStorage.getItem('supervisorToken');
+        const res = await fetch('http://localhost:5000/api/supervisions/requests', {
+          headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
         setRequests(data.requests || []);
       } catch (err) {
-        console.error("Error fetching supervision requests:", err);
+        console.error(err);
       } finally {
         setLoading(false);
       }
     };
-
     fetchRequests();
   }, []);
 
   const handleStatusChange = async (id, status) => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/supervision/update/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+      const token = localStorage.getItem('supervisorToken');
+      const res = await fetch(`http://localhost:5000/api/supervisions/update/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status }),
       });
-
-      if (!res.ok) throw new Error("Failed to update status");
-
       const data = await res.json();
-      setRequests((prev) =>
-        prev.map((r) => (r._id === id ? data.supervision : r))
-      );
+      setRequests((prev) => prev.map((r) => (r._id === id ? data.supervision : r)));
     } catch (err) {
-      console.error("Error updating status:", err);
-      alert("Error updating status. Try again.");
+      console.error(err);
+      alert('Error updating status');
     }
   };
 
   const handleFeedbackSave = async (id) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem('supervisorToken');
       const feedback = feedbackText[id];
-
-      const res = await fetch(`http://localhost:5000/api/supervision/update/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+      const res = await fetch(`http://localhost:5000/api/supervisions/update/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ feedback }),
       });
-
-      if (!res.ok) throw new Error("Failed to save feedback");
-
       const data = await res.json();
-      setRequests((prev) =>
-        prev.map((r) => (r._id === id ? data.supervision : r))
-      );
-
-      alert("Feedback saved successfully!");
+      setRequests((prev) => prev.map((r) => (r._id === id ? data.supervision : r)));
+      alert('Feedback saved!');
     } catch (err) {
-      console.error("Error saving feedback:", err);
-      alert("Error saving feedback. Try again.");
+      console.error(err);
+      alert('Error saving feedback');
     }
   };
 
   const handleFeedbackDelete = (id) => {
-    setFeedbackText((prev) => ({ ...prev, [id]: "" }));
-    setRequests((prev) =>
-      prev.map((r) => (r._id === id ? { ...r, feedback: "" } : r))
-    );
-    alert("Feedback deleted");
+    setFeedbackText((prev) => ({ ...prev, [id]: '' }));
+    setRequests((prev) => prev.map((r) => (r._id === id ? { ...r, feedback: '' } : r)));
+    alert('Feedback deleted');
+  };
+
+  const handleFundingChange = async (id, viable, reason) => {
+    try {
+      const token = localStorage.getItem('supervisorToken');
+      const feasibility = viable ? 'Feasible' : 'Not Feasible';
+      const res = await fetch(`http://localhost:5000/api/supervisions/update/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ feasibility, reason }),
+      });
+      const data = await res.json();
+      if (data?.supervision) {
+        setRequests((prev) => prev.map((r) => (r._id === id ? data.supervision : r)));
+      }
+      setFundingStatus((prev) => ({ ...prev, [id]: { viable, reason } }));
+      alert('Funding decision saved!');
+    } catch (err) {
+      console.error(err);
+      alert('Error updating funding status');
+    }
   };
 
   const getStatusBadge = (status) => {
     switch (status) {
-      case "pending":
-        return (
-          <span
-            className="badge fs-6 px-3 py-2"
-            style={{ backgroundColor: "#f59e0b", color: "#fff" }}
-          >
-            <Clock className="me-1" size={14} /> Pending Review
-          </span>
-        );
-      case "accepted":
-        return (
-          <span
-            className="badge fs-6 px-3 py-2"
-            style={{ backgroundColor: "#10b981", color: "#fff" }}
-          >
-            <CheckCircle className="me-1" size={14} /> Active
-          </span>
-        );
-      case "finished":
-        return (
-          <span
-            className="badge fs-6 px-3 py-2"
-            style={{ backgroundColor: "#00798c", color: "#fff" }}
-          >
-            <Award className="me-1" size={14} /> Completed
-          </span>
-        );
-      case "rejected":
-        return (
-          <span
-            className="badge fs-6 px-3 py-2"
-            style={{ backgroundColor: "#dc2626", color: "#fff" }}
-          >
-            <XCircle className="me-1" size={14} /> Rejected
-          </span>
-        );
+      case 'Pending':
+        return <Badge bg="warning">Pending</Badge>;
+      case 'Current':
+        return <Badge bg="success">Current</Badge>;
+      case 'Finished':
+        return <Badge bg="primary">Finished</Badge>;
       default:
         return null;
     }
   };
 
-  if (loading) {
-    return (
-      <div
-        className="min-vh-100 d-flex align-items-center justify-content-center"
-        style={{ backgroundColor: "#f8fafc" }}
-      >
-        <div className="text-center">
-          <div
-            className="spinner-border"
-            style={{ width: "3rem", height: "3rem", color: "#00798c" }}
-            role="status"
-          >
-            <span className="visually-hidden">Loading...</span>
-          </div>
-          <h4 className="mt-3" style={{ color: "#0d3b66" }}>
-            Loading Dashboard...
-          </h4>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="text-center p-5">Loading Dashboard...</div>;
 
-  const dashboardName = (() => {
-    if (!auth.name) return "Supervisor";
-    const parts = auth.name.trim().split(" ");
-    if (parts.length > 1 && parts[0].toLowerCase().startsWith("dr"))
-      return parts.slice(1).join(" ");
-    return auth.name;
-  })();
+  const dashboardName = auth?.name || 'Supervisor';
+
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: <HouseDoor /> },
+    { id: 'requests', label: 'Supervision Requests', icon: <FileEarmarkText /> },
+    { id: 'feedback', label: 'Feedback', icon: <FileEarmarkText /> },
+    { id: 'fundingRequest', label: 'Funding Requests', icon: <FileEarmark /> },
+    { id: 'profile', label: 'Profile', icon: <PersonCircle /> },
+  ];
 
   return (
-    <div
-      className="min-vh-100 d-flex flex-column"
-      style={{ backgroundColor: "#f8fafc" }}
-    >
-      <DashboardHeader  />
-
-      <main className="flex-grow-1" style={{ paddingBottom: "50px" }}>
-        <div className="d-flex">
-          {/* Sidebar */}
-          <div
-            className="text-white"
-            style={{
-              width: "300px",
-              position: "static",
-              minHeight: "100vh",
-              background:
-                "linear-gradient(180deg, #0d3b66 0%, #00798c 100%)",
-              boxShadow: "4px 0 15px rgba(13, 59, 102, 0.2)",
-            }}
+    <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f5f7fb' }}>
+      {/* Sidebar */}
+      <div
+        className="d-flex flex-column text-white position-relative"
+        style={{
+          width: sidebarOpen ? '280px' : '80px',
+          minHeight: '100vh',
+          backgroundColor: '#00798c',
+          borderRight: '1px solid #e2e8f0',
+          boxShadow: '2px 0 10px rgba(0,0,0,0.05)',
+          transition: 'width 0.3s ease',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header Section */}
+        <div
+          className="text-center px-3 pt-4 pb-3 position-relative"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.15)' }}
+        >
+          {/* Toggle button */}
+          <Button
+            variant="link"
+            className="position-absolute top-0 end-0 mt-3 me-3 p-0"
+            onClick={toggleSidebar}
+            style={{ color: 'white' }}
           >
-            <div className="py-4 px-4" style={{ minHeight: "100vh" }}>
-              {/* Logo and Header */}
-              <div
-                className="text-center mb-4 pb-4"
-                style={{
-                  borderBottom: "2px solid rgba(255,255,255,0.2)",
-                }}
-              >
-                <div
-                  className="bg-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3 shadow-lg"
-                  style={{ width: "80px", height: "80px" }}
-                >
-                  <img
-                    src="/emblem.png"
-                    alt="Ministry Logo"
-                    className="rounded-circle"
-                    style={{ width: "55px", height: "55px" }}
-                  />
-                </div>
-                <h5 className="fw-bold mb-2" style={{ fontSize: "1.2rem" }}>
-                  Research Supervision Portal
-                </h5>
-                <small className="text-light d-block mb-1">
-                  Ministry of Science & Technology
-                </small>
-                <small className="text-light">Sri Lanka</small>
-              </div>
+            <LayoutSidebar size={22} />
+          </Button>
 
-              {/* Scroll-based Nav Links */}
-              <nav className="nav flex-column gap-2 mt-3">
-                {[
-                  { id: "overview-section", icon: BarChart3, label: "Dashboard Overview" },
-                  { id: "requests-section", icon: FileText, label: "Supervision Requests" },
-                  { id: "feedback-section", icon: TrendingUp, label: "Feedback Management" },
-                  { id: "ongoing-section", icon: Clock, label: "Ongoing Projects" },
-                  { id: "completed-section", icon: Award, label: "Completed Projects" },
-                ].map(({ id, icon: Icon, label }) => (
-                  <button
-                    key={id}
-                    className="nav-link text-white d-flex align-items-center py-3 px-4 rounded government-nav-link border-0 bg-transparent text-start"
-                    onClick={() =>
-                      document
-                        .getElementById(id)
-                        .scrollIntoView({ behavior: "smooth" })
-                    }
-                    style={{ transition: "all 0.3s ease", fontSize: "0.95rem" }}
-                  >
-                    <Icon className="me-3" size={18} />
-                    <span className="fw-medium">{label}</span>
-                  </button>
-                ))}
-              </nav>
-            </div>
+          {/* Logo */}
+          <div
+            className="bg-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3 shadow-sm"
+            style={{ width: '70px', height: '70px' }}
+          >
+            <img
+              src="/emblem.png"
+              alt="Ministry Logo"
+              className="rounded-circle"
+              style={{ width: '48px', height: '48px' }}
+            />
           </div>
 
-          {/* Main Content */}
-          <div className="flex-grow-1 p-4">
-            {/* Overview Section */}
-            <section id="overview-section" className="mb-5">
-              <div className="card border-0 shadow-lg mb-4" style={{ background: "linear-gradient(135deg, #0d3b66, #00798c)" }}>
-                <div className="card-body text-white p-5 d-flex justify-content-between align-items-center">
-                  <div>
-                    <h1 className="fw-bold">Supervision Dashboard</h1>
-                    <p className="mb-1">Welcome, {dashboardName}</p>
-                    <p className="opacity-75">Ministry of Science & Technology - Research Division</p>
-                  </div>
-                  <div className="text-end">
-                    <small className="text-light d-block">Today's Date</small>
-                    <strong>{new Date().toLocaleDateString("en-GB")}</strong>
-                  </div>
-                </div>
-              </div>
+          {/* Title */}
+          {sidebarOpen && (
+            <>
+              <h5 className="fw-bold mb-1 text-white" style={{ fontSize: '1.1rem' }}>
+                Supervisor Panel
+              </h5>
+              <small className="text-light d-block" style={{ lineHeight: '1.3' }}>
+                Ministry of Science & Technology
+                <br />
+                Sri Lanka
+              </small>
+            </>
+          )}
+        </div>
 
-              {/* Status Cards */}
-              <div className="row g-4">
-                {[
-                  { status: "pending", color: "#f59e0b", icon: Clock, title: "Pending Requests", subtitle: "Requires Review" },
-                  { status: "accepted", color: "#10b981", icon: TrendingUp, title: "Active Projects", subtitle: "In Progress" },
-                  { status: "finished", color: "#00798c", icon: Award, title: "Completed", subtitle: "Successfully Finished" },
-                  { status: "rejected", color: "#dc2626", icon: XCircle, title: "Rejected", subtitle: "Not Approved" },
-                ].map(({ status, color, icon: Icon, title, subtitle }) => (
-                  <div className="col-lg-3 col-md-6" key={status}>
-                    <div className="card border-0 shadow-sm h-100" style={{ borderLeft: `5px solid ${color}` }}>
-                      <div className="card-body d-flex align-items-center">
-                        <div className="rounded-circle d-flex align-items-center justify-content-center me-3"
-                          style={{ width: "60px", height: "60px", backgroundColor: `${color}22` }}>
-                          <Icon style={{ color }} size={28} />
-                        </div>
-                        <div>
-                          <h3 className="fw-bold mb-1" style={{ color: "#0d3b66" }}>{requests.filter(r => r.status === status).length}</h3>
-                          <h6 className="fw-semibold text-muted mb-0">{title}</h6>
-                          <small className="text-muted">{subtitle}</small>
-                        </div>
+        {/* Sidebar Links */}
+        <Nav className="flex-column flex-grow-1 px-2">
+          {navItems.map((item) => (
+            <Nav.Link
+              key={item.id}
+              onClick={() => {
+                if (item.id === 'profile') {
+                  navigate('/supervisor/profile');
+                } else if (item.id === 'feedback') {
+                  navigate('/supervisor/feedback');
+                } else {
+                  setActiveTab(item.id);
+                }
+              }}
+              className={`text-white d-flex align-items-center gap-2 my-1 p-2 rounded ${
+                activeTab === item.id ? 'fw-bold bg-white bg-opacity-10' : ''
+              }`}
+              style={{ transition: '0.2s' }}
+            >
+              {item.icon}
+              <span className={`${!sidebarOpen ? 'd-none' : ''}`}>{item.label}</span>
+            </Nav.Link>
+          ))}
+
+          {/* Logout */}
+          <div className="mt-auto pt-3 border-top">
+            <Nav.Link
+              className="d-flex align-items-center py-3 px-3 rounded-3"
+              style={{
+                color: '#dc3545',
+                transition: '0.2s',
+              }}
+              onClick={() => {
+                localStorage.removeItem('supervisorToken');
+                localStorage.removeItem('supervisorInfo');
+                setAuth({ ...auth, supervisor: false });
+                navigate('/login');
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = 'rgba(220,53,69,0.1)')
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = 'transparent')
+              }
+            >
+              <BoxArrowRight size={20} className="me-3" />
+              {sidebarOpen && <span>Logout</span>}
+            </Nav.Link>
+            <Nav.Link
+                          className="d-flex align-items-center py-3 px-3 rounded-3 mt-2"
+                          style={{ color: "#f8fafc", transition: "0.2s", cursor: "pointer" }}
+                          onClick={() => {
+                            navigate(-1); // navigate backward
+                          }}
+                        >
+                     <BoxArrowRight
+                      size={20}
+                      className="me-3"
+                      style={{ transform: "rotate(180deg)" }}
+                    />
+                    <span>Go Back</span>
+               </Nav.Link>
+          </div>
+        </Nav>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-grow-1 p-4">
+        {activeTab === 'dashboard' && (
+          <>
+            <Card className="border-0 shadow" style={{ borderRadius: 16 }}>
+              <div className="p-4 text-white" style={{ background: 'linear-gradient(135deg, #0d3b66, #00798c)', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
+                <h2 className="mb-0">Welcome, {dashboardName}</h2>
+                <div className="text-white-50">Overview of your supervisions and actions</div>
+              </div>
+            </Card>
+            <Row className="g-4 mt-1">
+              {['Pending', 'Current', 'Finished'].map((status) => (
+                <Col key={status} md={3}>
+                  <Card className="shadow-sm border-0" style={{ borderRadius: 14 }}>
+                    <Card.Body className="p-3">
+                      <div className="d-flex align-items-center justify-content-between">
+                        <h6 className="mb-0 text-muted">{status}</h6>
+                        {getStatusBadge(status)}
                       </div>
+                      <div className="display-6 fw-bold mt-2">{requests.filter((r) => r.status === status).length}</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+            <Row className="mt-3">
+              <Col md={12}>
+                <Card className="border-0 shadow-sm" style={{ borderRadius: 14 }}>
+                  <Card.Body>
+                    <h5 className="mb-2">Quick Tips</h5>
+                    <div className="text-muted small">Use the sidebar to manage supervision requests, add feedback to Current items, and record feasibility for Finished projects.</div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+          </>
+        )}
+
+        {activeTab === 'requests' && (
+          <Card className="shadow-lg border-0" style={{ borderRadius: 14 }}>
+            <Card.Header className="text-white" style={{ background: 'linear-gradient(135deg, #0d3b66, #00798c)' }}>
+              <h5 className="mb-0">Supervision Requests</h5>
+            </Card.Header>
+            <Card.Body className="p-0">
+              <div className="table-responsive">
+                <table className="table table-hover mb-0 align-middle">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Researcher</th>
+                      <th>Title</th>
+                      <th>Duration</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {requests.map((req, i) => (
+                      <React.Fragment key={req._id}>
+                        <tr>
+                          <td>{i + 1}</td>
+                          <td>{req.researcher?.name}</td>
+                          <td>{req.projectTitle}</td>
+                          <td>{req.durationMonths || 'N/A'}</td>
+                          <td>{getStatusBadge(req.status)}</td>
+                          <td>
+                            {req.status === 'Pending' && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="success"
+                                  onClick={() => handleStatusChange(req._id, 'Current')}
+                                >
+                                  Approve (Make Current)
+                                </Button>{' '}
+                              </>
+                            )}
+                          </td>
+                        </tr>
+
+                        {req.status === 'Current' && (
+                          <tr>
+                            <td colSpan="6">
+                              <div className="p-3 bg-light border rounded" style={{ borderRadius: 12 }}>
+                                <h6 className="mb-2">Add Feedback</h6>
+                                <textarea
+                                  className="form-control mb-2"
+                                  placeholder="Provide feedback..."
+                                  value={feedbackText[req._id] || ''}
+                                  onChange={(e) =>
+                                    setFeedbackText({
+                                      ...feedbackText,
+                                      [req._id]: e.target.value,
+                                    })
+                                  }
+                                />
+                                <div className="d-flex gap-2">
+                                  <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={() => handleFeedbackSave(req._id)}
+                                  >
+                                    Save Feedback
+                                  </Button>
+                                  <Button
+                                    variant="outline-danger"
+                                    size="sm"
+                                    onClick={() => handleFeedbackDelete(req._id)}
+                                  >
+                                    Clear
+                                  </Button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card.Body>
+          </Card>
+        )}
+
+        {activeTab === 'fundingRequest' && (
+          <Card className="shadow-lg border-0" style={{ borderRadius: 14 }}>
+            <Card.Header className="text-white" style={{ background: 'linear-gradient(135deg, #0d3b66, #00798c)' }}>
+              <h5 className="mb-0">Funding Feasibility</h5>
+            </Card.Header>
+            <Card.Body>
+              {requests.filter((r) => r.status === 'Finished').length === 0 && (
+                <p className="text-muted mb-0">No finished projects to validate.</p>
+              )}
+              {requests
+                .filter((r) => r.status === 'Finished')
+                .map((req, i) => (
+                  <div key={req._id} className="mb-3 p-3 border rounded bg-light" style={{ borderRadius: 12 }}>
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <h6 className="mb-0">{i + 1}. {req.projectTitle}</h6>
+                      <div className="text-muted small">Researcher: {req.researcher?.name}</div>
+                    </div>
+                    <div className="d-flex align-items-center gap-2 flex-wrap">
+                      <Button
+                        variant={
+                          fundingStatus[req._id]?.viable ? 'success' : 'outline-success'
+                        }
+                        size="sm"
+                        onClick={() =>
+                          handleFundingChange(req._id, true, 'Viable for funding')
+                        }
+                      >
+                        Viable
+                      </Button>
+                      <Button
+                        variant={
+                          fundingStatus[req._id]?.viable === false
+                            ? 'danger'
+                            : 'outline-danger'
+                        }
+                        size="sm"
+                        onClick={() =>
+                          handleFundingChange(req._id, false, 'Not viable')
+                        }
+                      >
+                        Not Viable
+                      </Button>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        placeholder="Reason (optional)"
+                        value={fundingStatus[req._id]?.reason || ''}
+                        onChange={(e) =>
+                          setFundingStatus((prev) => ({
+                            ...prev,
+                            [req._id]: {
+                              ...prev[req._id],
+                              reason: e.target.value,
+                            },
+                          }))
+                        }
+                        style={{ maxWidth: '300px' }}
+                      />
                     </div>
                   </div>
                 ))}
-              </div>
-            </section>
-
-            {/* Requests Section */}
-            <section id="requests-section" className="mb-5">
-              <div className="card border-0 shadow-lg">
-                <div className="card-header text-white p-4" style={{ background: "linear-gradient(135deg, #0d3b66, #00798c)" }}>
-                  <h3 className="fw-bold mb-1">Research Supervision Requests Management</h3>
-                  <p className="mb-0">Ministry of Science & Technology - Research Funding Division</p>
-                </div>
-                <div className="card-body p-0">
-                  <div className="table-responsive">
-                    <table className="table table-hover mb-0">
-                      <thead style={{ backgroundColor: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
-                        <tr>
-                          <th>#</th>
-                          <th>Researcher</th>
-                          <th>Research Title</th>
-                          <th>Duration</th>
-                          <th>Status</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {requests.map((req, i) => (
-                          <React.Fragment key={req._id}>
-                            <tr>
-                              <td>{i + 1}</td>
-                              <td>{req.researcher?.name}</td>
-                              <td>{req.projectTitle}</td>
-                              <td>{req.durationMonths || "N/A"}</td>
-                              <td>{getStatusBadge(req.status)}</td>
-                              <td>
-                                {req.status === "pending" ? (
-                                  <>
-                                    <button
-                                      className="btn btn-sm btn-success me-2"
-                                      onClick={() => handleStatusChange(req._id, "accepted")}
-                                    >
-                                      Approve
-                                    </button>
-                                    <button
-                                      className="btn btn-sm btn-danger"
-                                      onClick={() => handleStatusChange(req._id, "rejected")}
-                                    >
-                                      Reject
-                                    </button>
-                                  </>
-                                ) : (
-                                  <button className="btn btn-sm btn-secondary" disabled>
-                                    Processed
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-
-                            {/* Feedback Section */}
-                            {req.status === "accepted" && (
-                              <tr style={{ backgroundColor: "#f8fafc" }}>
-                                <td colSpan="6">
-                                  <div className="p-4">
-                                    <label className="fw-semibold text-dark">Supervisor Feedback</label>
-                                    <textarea
-                                      value={feedbackText[req._id] || ""}
-                                      onChange={(e) =>
-                                        setFeedbackText({ ...feedbackText, [req._id]: e.target.value })
-                                      }
-                                      className="form-control mb-3"
-                                      rows="3"
-                                      placeholder="Provide feedback for this research..."
-                                    />
-                                    <button
-                                      onClick={() => handleFeedbackSave(req._id)}
-                                      className="btn btn-primary me-2"
-                                    >
-                                      Save Feedback
-                                    </button>
-                                    <button
-                                      onClick={() => handleFeedbackDelete(req._id)}
-                                      className="btn btn-outline-danger"
-                                    >
-                                      Clear
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </section>
-          </div>
-        </div>
-      </main>
-
-      <DashboardFooter />
+            </Card.Body>
+          </Card>
+        )}
+      </div>
     </div>
   );
 };
 
 export default SupervisorDashboard;
 
-// import React, { useState, useEffect } from "react";
-// import {
-//   CheckCircle,
-//   XCircle,
-//   Clock,
-//   Award,
-//   TrendingUp,
-//   FileText,
-//   BarChart3,
-// } from "lucide-react";
-// import DashboardHeader from "../components/layout/DashboardHeader";
-// import DashboardFooter from "../components/layout/DashboardFooter";
 
-// const SupervisorDashboard = ({ auth }) => {
-//   const [requests, setRequests] = useState([]);
-//   const [feedbackText, setFeedbackText] = useState({});
-//   const [loading, setLoading] = useState(true);
-//   const [toasts, setToasts] = useState([]);
-
-//   useEffect(() => {
-//     const fetchRequests = async () => {
-//       try {
-//         const token = localStorage.getItem("token");
-//         const res = await fetch("http://localhost:5000/api/supervision/requests", {
-//           headers: { Authorization: `Bearer ${token}` },
-//         });
-//         const data = await res.json();
-//         setRequests(data.requests || []);
-//       } catch (err) {
-//         console.error("Error fetching supervision requests:", err);
-//         setToasts((t) => [...t, { id: Date.now(), bg: "danger", text: "Failed to fetch requests." }]);
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-//     fetchRequests();
-//   }, []);
-
-//   const handleStatusChange = async (id, status) => {
-//     try {
-//       const token = localStorage.getItem("token");
-//       const res = await fetch(`http://localhost:5000/api/supervision/update/${id}`, {
-//         method: "PUT",
-//         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-//         body: JSON.stringify({ status }),
-//       });
-//       if (!res.ok) throw new Error("Failed to update status");
-//       const data = await res.json();
-//       setRequests((prev) => prev.map((r) => (r._id === id ? data.supervision : r)));
-//       setToasts((t) => [...t, { id: Date.now(), bg: "success", text: "Status updated successfully." }]);
-//     } catch (err) {
-//       console.error("Error updating status:", err);
-//       setToasts((t) => [...t, { id: Date.now(), bg: "danger", text: "Failed to update status." }]);
-//     }
-//   };
-
-//   const handleFeedbackSave = async (id) => {
-//     try {
-//       const token = localStorage.getItem("token");
-//       const feedback = feedbackText[id];
-//       const res = await fetch(`http://localhost:5000/api/supervision/update/${id}`, {
-//         method: "PUT",
-//         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-//         body: JSON.stringify({ feedback }),
-//       });
-//       if (!res.ok) throw new Error("Failed to save feedback");
-//       const data = await res.json();
-//       setRequests((prev) => prev.map((r) => (r._id === id ? data.supervision : r)));
-//       setToasts((t) => [...t, { id: Date.now(), bg: "success", text: "Feedback saved successfully." }]);
-//     } catch (err) {
-//       console.error("Error saving feedback:", err);
-//       setToasts((t) => [...t, { id: Date.now(), bg: "danger", text: "Failed to save feedback." }]);
-//     }
-//   };
-
-//   const handleFeedbackDelete = (id) => {
-//     setFeedbackText((prev) => ({ ...prev, [id]: "" }));
-//     setRequests((prev) => prev.map((r) => (r._id === id ? { ...r, feedback: "" } : r)));
-//     setToasts((t) => [...t, { id: Date.now(), bg: "warning", text: "Feedback cleared." }]);
-//   };
-
-//   const getStatusBadge = (status) => {
-//     const variants = {
-//       pending: { color: "#f59e0b", label: "Pending Review", Icon: Clock },
-//       accepted: { color: "#10b981", label: "Active", Icon: CheckCircle },
-//       finished: { color: "#00798c", label: "Completed", Icon: Award },
-//       rejected: { color: "#dc2626", label: "Rejected", Icon: XCircle },
-//     };
-//     const v = variants[status];
-//     if (!v) return null;
-//     return (
-//       <span className="badge fs-6 px-3 py-2" style={{ backgroundColor: v.color, color: "#fff" }}>
-//         <v.Icon className="me-1" size={14} /> {v.label}
-//       </span>
-//     );
-//   };
-
-//   const dashboardName = (() => {
-//     if (!auth.name) return "Supervisor";
-//     const parts = auth.name.trim().split(" ");
-//     if (parts.length > 1 && parts[0].toLowerCase().startsWith("dr"))
-//       return parts.slice(1).join(" ");
-//     return auth.name;
-//   })();
-
-//   if (loading) {
-//     return (
-//       <>
-//         <DashboardHeader auth={auth} />
-//         <div className="my-5 text-center">
-//           <div className="spinner-border text-primary" role="status"></div>
-//           <p className="mt-3">Loading Dashboard...</p>
-//         </div>
-//         <DashboardFooter />
-//       </>
-//     );
-//   }
-
-//   return (
-//     <>
-//       <DashboardHeader auth={auth} />
-
-//       <div className="container my-5">
-//         {/* Welcome Card */}
-//         <div className="card bg-primary text-white shadow mb-4 p-4">
-//           <h2>Welcome, {dashboardName}!</h2>
-//           <p>Manage research supervision requests and track project status.</p>
-//         </div>
-
-//         {/* Status Overview Cards */}
-//         <div className="row mb-4">
-//           {["pending", "accepted", "finished", "rejected"].map((status) => (
-//             <div className="col-md-3 mb-3" key={status}>
-//               <div className="card shadow-sm h-100 p-3">
-//                 <h5>{status.charAt(0).toUpperCase() + status.slice(1)}</h5>
-//                 <p className="mb-0">{requests.filter((r) => r.status === status).length}</p>
-//               </div>
-//             </div>
-//           ))}
-//         </div>
-
-//         {/* Requests Table */}
-//         <div className="card shadow mb-4">
-//           <div className="card-header bg-light">
-//             <h5 className="mb-0">Supervision Requests</h5>
-//           </div>
-//           <div className="card-body table-responsive">
-//             <table className="table table-hover">
-//               <thead>
-//                 <tr>
-//                   <th>#</th>
-//                   <th>Researcher</th>
-//                   <th>Title</th>
-//                   <th>Duration</th>
-//                   <th>Status</th>
-//                   <th>Actions</th>
-//                 </tr>
-//               </thead>
-//               <tbody>
-//                 {requests.map((req, i) => (
-//                   <React.Fragment key={req._id}>
-//                     <tr>
-//                       <td>{i + 1}</td>
-//                       <td>{req.researcher?.name}</td>
-//                       <td>{req.projectTitle}</td>
-//                       <td>{req.durationMonths || "N/A"}</td>
-//                       <td>{getStatusBadge(req.status)}</td>
-//                       <td>
-//                         {req.status === "pending" ? (
-//                           <>
-//                             <button
-//                               className="btn btn-sm btn-success me-2"
-//                               onClick={() => handleStatusChange(req._id, "accepted")}
-//                             >
-//                               Approve
-//                             </button>
-//                             <button
-//                               className="btn btn-sm btn-danger"
-//                               onClick={() => handleStatusChange(req._id, "rejected")}
-//                             >
-//                               Reject
-//                             </button>
-//                           </>
-//                         ) : (
-//                           <button className="btn btn-sm btn-secondary" disabled>
-//                             Processed
-//                           </button>
-//                         )}
-//                       </td>
-//                     </tr>
-
-//                     {req.status === "accepted" && (
-//                       <tr style={{ backgroundColor: "#f8fafc" }}>
-//                         <td colSpan="6">
-//                           <textarea
-//                             value={feedbackText[req._id] || ""}
-//                             onChange={(e) =>
-//                               setFeedbackText({ ...feedbackText, [req._id]: e.target.value })
-//                             }
-//                             className="form-control mb-2"
-//                             rows="3"
-//                             placeholder="Provide feedback..."
-//                           />
-//                           <button
-//                             className="btn btn-primary me-2"
-//                             onClick={() => handleFeedbackSave(req._id)}
-//                           >
-//                             Save
-//                           </button>
-//                           <button
-//                             className="btn btn-outline-danger"
-//                             onClick={() => handleFeedbackDelete(req._id)}
-//                           >
-//                             Clear
-//                           </button>
-//                         </td>
-//                       </tr>
-//                     )}
-//                   </React.Fragment>
-//                 ))}
-//               </tbody>
-//             </table>
-//           </div>
-//         </div>
-//       </div>
-
-//       <DashboardFooter />
-
-//       {/* Toast Container */}
-//       <div
-//         aria-live="polite"
-//         aria-atomic="true"
-//         className="position-fixed bottom-0 end-0 p-3"
-//         style={{ zIndex: 2000 }}
-//       >
-//         {toasts.map((t) => (
-//           <div
-//             key={t.id}
-//             className={`toast show text-white bg-${t.bg}`}
-//             role="alert"
-//             style={{ minWidth: "250px", marginBottom: "5px" }}
-//           >
-//             <div className="toast-body">{t.text}</div>
-//           </div>
-//         ))}
-//       </div>
-//     </>
-//   );
-// };
-
-// export default SupervisorDashboard;

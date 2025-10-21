@@ -1,5 +1,6 @@
 import express from "express";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import multer from "multer";
 import path from "path";
@@ -18,6 +19,45 @@ const __dirname = dirname(__filename);
 // Create directories
 const uploadsDir = path.join(__dirname, "../../uploads/supervisors");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+// ---------- Forgot Password (request) ----------
+router.post('/request-reset', async (req, res) => {
+  try {
+    const email = (req.body?.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+    const sup = await Supervisor.findOne({ email });
+    // Do not reveal user existence
+    if (!sup) return res.json({ success: true, message: 'If that email exists, a reset link has been generated.' });
+    const token = crypto.randomBytes(20).toString('hex');
+    const hashed = crypto.createHash('sha256').update(token).digest('hex');
+    sup.passwordResetToken = hashed;
+    sup.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
+    await sup.save({ validateBeforeSave: false });
+    return res.json({ success: true, message: 'Reset token generated', token });
+  } catch (err) {
+    console.error('supervisor request-reset error:', err);
+    return res.status(500).json({ success: false, message: 'Failed to initiate reset' });
+  }
+});
+
+// ---------- Forgot Password (reset) ----------
+router.post('/reset', async (req, res) => {
+  try {
+    const { token, password } = req.body || {};
+    if (!token || !password) return res.status(400).json({ success: false, message: 'Token and new password are required' });
+    const hashed = crypto.createHash('sha256').update(token).digest('hex');
+    const sup = await Supervisor.findOne({ passwordResetToken: hashed, passwordResetExpires: { $gt: new Date() } });
+    if (!sup) return res.status(400).json({ success: false, message: 'Invalid or expired token' });
+    sup.password = await bcrypt.hash(password, 12);
+    sup.passwordResetToken = null;
+    sup.passwordResetExpires = null;
+    await sup.save();
+    return res.json({ success: true, message: 'Password reset successful' });
+  } catch (err) {
+    console.error('supervisor reset error:', err);
+    return res.status(500).json({ success: false, message: 'Failed to reset password' });
+  }
+});
 
 const profileImagesDir = path.join(__dirname, "../../uploads/supervisors/profileImages");
 if (!fs.existsSync(profileImagesDir)) fs.mkdirSync(profileImagesDir, { recursive: true });
@@ -89,7 +129,7 @@ router.get('/list', getAllSupervisors);
 // ---------- Register ----------
 router.post("/register", uploadFields, async (req, res) => {
   try {
-    const { name, email, password, phone, address, title, affiliation, experience, domains, studies } = req.body;
+    const { name, email, password, phone, address, title, affiliation, experience, domains, studies, linkedin, googleScholar } = req.body;
 
     if (!name || !email || !password || !title || !affiliation || !experience) {
       cleanupFiles(req.files);
@@ -132,6 +172,8 @@ router.post("/register", uploadFields, async (req, res) => {
       studies: parsedStudies,
       cvFile: req.files.cvFile[0].path,
       transcripts: transcriptsMap,
+      linkedin: linkedin?.trim(),
+      googleScholar: googleScholar?.trim(),
     });
 
     await supervisor.save();

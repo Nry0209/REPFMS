@@ -13,7 +13,8 @@
 // // ✅ Ensure folders exist
 // ["uploads/researcher/cv", "uploads/researcher/transcripts"].forEach((dir) => {
 //   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-// });
+
+// (moved reset routes below after router is initialized)
 
 // // ✅ Multer configuration for CV & transcripts
 // const storage = multer.diskStorage({
@@ -603,6 +604,7 @@
 // backend/routes/researcherRoutes.js
 import express from "express";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import fs from "fs";
 import path from "path";
@@ -673,6 +675,109 @@ const verifyToken = (req, res, next) => {
     });
   }
 };
+
+// ✅ Researcher Registration (mirroring supervisor registration)
+router.post(
+  "/register",
+  upload.fields([
+    { name: "profilePhoto", maxCount: 1 },
+    { name: "cvFile", maxCount: 1 },
+    { name: "transcripts", maxCount: 10 },
+  ]),
+  async (req, res) => {
+    try {
+      const {
+        fullName,
+        email,
+        password,
+        department,
+        degree,
+        domains,
+        grants,
+        collaborations,
+        linkedin,
+        scopus,
+        googleScholar,
+        skills,
+        awards,
+      } = req.body;
+
+      // Basic validation
+      if (!fullName || !email || !password || !department) {
+        return res.status(400).json({ success: false, message: "Missing required fields" });
+      }
+
+      const existing = await Researcher.findOne({ email: email.toLowerCase().trim() });
+      if (existing) {
+        return res.status(400).json({ success: false, message: "Email already registered" });
+      }
+
+      // Parse arrays that may come as JSON strings
+      const parsedDomains = typeof domains === "string" ? (() => { try { return JSON.parse(domains); } catch { return [domains]; } })() : domains;
+      const parsedSkills = typeof skills === "string" ? (() => { try { return JSON.parse(skills); } catch { return [skills]; } })() : (skills || []);
+      const parsedAwards = typeof awards === "string" ? (() => { try { return JSON.parse(awards); } catch { return [awards]; } })() : (awards || []);
+
+      if (parsedDomains && (!Array.isArray(parsedDomains) || parsedDomains.length < 1 || parsedDomains.length > 3)) {
+        return res.status(400).json({ success: false, message: "Domains must be 1 to 3 items" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 12);
+
+      // Degree-based transcript requirement: if degree is provided, require at least one transcript
+      if (degree && (!req.files?.transcripts || req.files.transcripts.length === 0)) {
+        return res.status(400).json({ success: false, message: "Please upload at least one transcript for the selected degree" });
+      }
+
+      // Build transcripts map if provided
+      const transcriptsMap = {};
+      if (req.files?.transcripts?.length) {
+        req.files.transcripts.forEach((file) => {
+          const key = path.parse(file.originalname).name;
+          transcriptsMap[key] = `/uploads/researcher/transcripts/${file.filename}`;
+        });
+      }
+
+      const researcher = new Researcher({
+        fullName: fullName.trim(),
+        email: email.toLowerCase().trim(),
+        password: hashedPassword,
+        department: department.trim(),
+        degree: degree?.trim(),
+        domains: parsedDomains || [],
+        grants: grants?.trim(),
+        collaborations: collaborations?.trim(),
+        cvFile: req.files?.cvFile?.[0] ? `/uploads/researcher/cv/${req.files.cvFile[0].filename}` : undefined,
+        transcripts: transcriptsMap,
+        linkedin: linkedin?.trim(),
+        scopus: scopus?.trim(),
+        googleScholar: googleScholar?.trim(),
+        profilePhoto: req.files?.profilePhoto?.[0] ? `/uploads/researcher/profile/${req.files.profilePhoto[0].filename}` : undefined,
+        skills: parsedSkills,
+        awards: parsedAwards,
+      });
+
+      await researcher.save();
+
+      const token = generateToken(researcher._id);
+      return res.status(201).json({
+        success: true,
+        message: "Researcher registered successfully",
+        token,
+        researcher: {
+          _id: researcher._id,
+          fullName: researcher.fullName,
+          email: researcher.email,
+          domains: researcher.domains,
+          degree: researcher.degree,
+          department: researcher.department,
+        },
+      });
+    } catch (err) {
+      console.error("Researcher register error:", err);
+      return res.status(500).json({ success: false, message: "Registration failed", error: err.message });
+    }
+  }
+);
 
 // ✅ Get Supervisors by domains (for researcher view)
 router.get("/supervisors/by-domains", verifyToken, async (req, res) => {
@@ -834,6 +939,15 @@ router.post("/research/:id/request-supervision", verifyToken, async (req, res) =
   try {
     const { supervisorId } = req.body || {};
     if (!supervisorId) return res.status(400).json({ success: false, message: "supervisorId is required" });
+
+    // Prevent multiple concurrent or pending supervisions for this researcher
+    const existing = await Supervision.findOne({
+      researcher: req.userId,
+      status: { $in: ["Pending", "Current"] },
+    });
+    if (existing) {
+      return res.status(400).json({ success: false, message: "You already have a pending or current supervision." });
+    }
 
     const base = await Research.findById(req.params.id);
     if (!base) return res.status(404).json({ success: false, message: "Research not found" });

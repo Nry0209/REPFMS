@@ -1,767 +1,8 @@
-// import React, { useState, useEffect } from "react";
-// import { Container, Row, Col, Card, Form, Button, Badge, Spinner, Alert, Image } from "react-bootstrap";
-// import { useNavigate } from "react-router-dom";
-// import { User, Linkedin, BookOpen, Award } from "lucide-react";
-// import DashboardHeader from "../components/layout/DashboardHeader";
-// import DashboardFooter from "../components/layout/DashboardFooter";
-
-// const ResearcherProfile = ({ auth, setAuth }) => {
-//   const [loading, setLoading] = useState(true);
-//   const [saving, setSaving] = useState(false);
-//   const [error, setError] = useState("");
-//   const [success, setSuccess] = useState("");
-//   const [profile, setProfile] = useState(null);
-//   const [formData, setFormData] = useState({
-//     fullName: "",
-//     email: "",
-//     degree: "",
-//     domains: [],
-//     linkedin: "",
-//     scopus: "",
-//     googleScholar: "",
-//     collaborations: "",
-//     awards: "",
-//     skills: "",
-//   });
-//   const [files, setFiles] = useState({
-//     profileImage: null,
-//     cv: null,
-//     transcripts: [],
-//   });
-//   const navigate = useNavigate();
-
-//   useEffect(() => {
-//     fetchProfile();
-//   }, []);
-
-//   const fetchProfile = async () => {
-//     try {
-//       const token = localStorage.getItem("researcherToken");
-//       if (!token) {
-//         navigate("/researcher/auth");
-//         return;
-//       }
-//       const res = await fetch("http://localhost:5000/api/researchers/profile", {
-//         headers: { Authorization: `Bearer ${token}` },
-//       });
-//       const data = await res.json();
-//       if (!res.ok) throw new Error(data.message || "Failed to fetch profile");
-
-//       if (data.success) {
-//         setProfile(data.data.researcher);
-//         setFormData({
-//           fullName: data.data.researcher.fullName || "",
-//           email: data.data.researcher.email || "",
-//           degree: data.data.researcher.degree || "",
-//           domains: data.data.researcher.domains || [],
-//           linkedin: data.data.researcher.linkedin || "",
-//           scopus: data.data.researcher.scopus || "",
-//           googleScholar: data.data.researcher.googleScholar || "",
-//           collaborations: data.data.researcher.collaborations || "",
-//           awards: data.data.researcher.awards || "",
-//           skills: data.data.researcher.skills || "",
-//         });
-//       }
-//     } catch (err) {
-//       console.error(err);
-//       setError(err.message);
-//       if (err.message.includes("authorized")) {
-//         localStorage.removeItem("researcherToken");
-//         localStorage.removeItem("researcherInfo");
-//         navigate("/researcher/auth");
-//       }
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   const handleChange = (e) => {
-//     const { name, value } = e.target;
-//     setFormData((prev) => ({ ...prev, [name]: value }));
-//   };
-
-//   const handleFileChange = (e) => {
-//     const { name, files: selectedFiles } = e.target;
-//     if (name === "transcripts") {
-//       setFiles((prev) => ({ ...prev, transcripts: selectedFiles }));
-//     } else {
-//       setFiles((prev) => ({ ...prev, [name]: selectedFiles[0] }));
-//     }
-//   };
-
-//   const handleSubmit = async (e) => {
-//     e.preventDefault();
-//     setSaving(true);
-//     setError("");
-//     setSuccess("");
-
-//     try {
-//       const token = localStorage.getItem("researcherToken");
-//       if (!token) throw new Error("Not authorized");
-
-//       const form = new FormData();
-//       Object.keys(formData).forEach((key) => form.append(key, formData[key]));
-
-//       if (files.profileImage) form.append("profileImage", files.profileImage);
-//       if (files.cv) form.append("cv", files.cv);
-//       if (files.transcripts.length > 0) {
-//         Array.from(files.transcripts).forEach((file) => form.append("transcripts", file));
-//       }
-
-//       const res = await fetch("http://localhost:5000/api/researchers/profile/update", {
-//         method: "PUT",
-//         headers: { Authorization: `Bearer ${token}` },
-//         body: form,
-//       });
-
-//       const data = await res.json();
-//       if (!res.ok) throw new Error(data.message || "Failed to update profile");
-
-//       setSuccess("Profile updated successfully!");
-//       fetchProfile(); // Refresh profile
-//     } catch (err) {
-//       setError(err.message || "Failed to update profile");
-//     } finally {
-//       setSaving(false);
-//     }
-//   };
-
-//   if (loading) return (
-//     <>
-//       <DashboardHeader auth={auth} setAuth={setAuth} />
-//       <Container className="my-5 text-center">
-//         <Spinner animation="border" /> <p>Loading profile...</p>
-//       </Container>
-//       <DashboardFooter />
-//     </>
-//   );
-
-//   return (
-//     <>
-//       <DashboardHeader auth={auth} setAuth={setAuth} />
-//       <Container className="my-5">
-//         <Row>
-//           <Col md={4}>
-//             <Card className="p-3 text-center shadow-sm">
-//               <Image
-//                 src={profile?.profileImage ? `http://localhost:5000/${profile.profileImage}` : "/default-avatar.png"}
-//                 roundedCircle
-//                 width={150}
-//                 height={150}
-//                 className="mb-3"
-//               />
-//               <h5>{profile.fullName}</h5>
-//               <p className="text-muted">{profile.degree}</p>
-//               <p>Domains: {profile.domains?.map((d, idx) => <Badge key={idx} bg="info" className="me-1">{d}</Badge>)}</p>
-//             </Card>
-//           </Col>
-
-//           <Col md={8}>
-//             <Card className="p-3 shadow-sm">
-//               <h5>Edit Profile</h5>
-//               {error && <Alert variant="danger">{error}</Alert>}
-//               {success && <Alert variant="success">{success}</Alert>}
-
-//               <Form onSubmit={handleSubmit} encType="multipart/form-data">
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Full Name</Form.Label>
-//                   <Form.Control type="text" name="fullName" value={formData.fullName} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Email (read-only)</Form.Label>
-//                   <Form.Control type="email" name="email" value={formData.email} readOnly />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Degree</Form.Label>
-//                   <Form.Control type="text" name="degree" value={formData.degree} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Domains (comma separated)</Form.Label>
-//                   <Form.Control type="text" name="domains" value={formData.domains.join(", ")} onChange={(e) => setFormData(prev => ({ ...prev, domains: e.target.value.split(",").map(d => d.trim()) }))} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>LinkedIn</Form.Label>
-//                   <Form.Control type="text" name="linkedin" value={formData.linkedin} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Scopus</Form.Label>
-//                   <Form.Control type="text" name="scopus" value={formData.scopus} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Google Scholar</Form.Label>
-//                   <Form.Control type="text" name="googleScholar" value={formData.googleScholar} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Skills</Form.Label>
-//                   <Form.Control type="text" name="skills" value={formData.skills} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Awards</Form.Label>
-//                   <Form.Control type="text" name="awards" value={formData.awards} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Collaborations</Form.Label>
-//                   <Form.Control type="text" name="collaborations" value={formData.collaborations} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Profile Image</Form.Label>
-//                   <Form.Control type="file" name="profileImage" accept="image/*" onChange={handleFileChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>CV</Form.Label>
-//                   <Form.Control type="file" name="cv" accept=".pdf,.doc,.docx" onChange={handleFileChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Transcripts</Form.Label>
-//                   <Form.Control type="file" name="transcripts" multiple accept=".pdf,.doc,.docx" onChange={handleFileChange} />
-//                 </Form.Group>
-
-//                 <Button type="submit" className="mt-3" disabled={saving}>
-//                   {saving ? "Saving..." : "Save Changes"}
-//                 </Button>
-//               </Form>
-//             </Card>
-//           </Col>
-//         </Row>
-//       </Container>
-//       <DashboardFooter />
-//     </>
-//   );
-// };
-
-// export default ResearcherProfile;
-
-
-
-// import React, { useState, useEffect } from "react";
-// import { Container, Row, Col, Card, Form, Button, Badge, Spinner, Alert, Image } from "react-bootstrap";
-// import { useNavigate } from "react-router-dom";
-// import DashboardHeader from "../components/layout/DashboardHeader";
-// import DashboardFooter from "../components/layout/DashboardFooter";
-
-// const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
-
-// const ResearcherProfile = ({ auth, setAuth }) => {
-//   const [loading, setLoading] = useState(true);
-//   const [saving, setSaving] = useState(false);
-//   const [error, setError] = useState("");
-//   const [success, setSuccess] = useState("");
-//   const [profile, setProfile] = useState(null);
-//   const [formData, setFormData] = useState({
-//     fullName: "",
-//     email: "",
-//     degree: "",
-//     domains: [],
-//     linkedin: "",
-//     scopus: "",
-//     googleScholar: "",
-//     collaborations: "",
-//     awards: "",
-//     skills: "",
-//   });
-//   const [files, setFiles] = useState({
-//     profileImage: null,
-//     cv: null,
-//     transcripts: [],
-//   });
-
-//   const navigate = useNavigate();
-
-//   useEffect(() => {
-//     fetchProfile();
-//   }, []);
-
-//   const fetchProfile = async () => {
-//     try {
-//       const token = localStorage.getItem("researcherToken");
-//       if (!token) {
-//         navigate("/researcher/auth");
-//         return;
-//       }
-
-//       const res = await fetch(`${API_BASE_URL}/researchers/profile`, {
-//         headers: { Authorization: `Bearer ${token}` },
-//       });
-
-//       const data = await res.json();
-
-//       if (!res.ok) throw new Error(data.message || "Failed to fetch profile");
-
-//       // Backend returns researcher object directly
-//       setProfile(data);
-//       setFormData({
-//         fullName: data.fullName || "",
-//         email: data.email || "",
-//         degree: data.degree || "",
-//         domains: data.domains || [],
-//         linkedin: data.linkedin || "",
-//         scopus: data.scopus || "",
-//         googleScholar: data.googleScholar || "",
-//         collaborations: data.collaborations || "",
-//         awards: data.awards || "",
-//         skills: data.skills || "",
-//       });
-//     } catch (err) {
-//       console.error(err);
-//       setError(err.message);
-//       if (err.message.toLowerCase().includes("unauthorized")) {
-//         localStorage.removeItem("researcherToken");
-//         localStorage.removeItem("researcherInfo");
-//         navigate("/researcher/auth");
-//       }
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   const handleChange = (e) => {
-//     const { name, value } = e.target;
-//     setFormData((prev) => ({ ...prev, [name]: value }));
-//   };
-
-//   const handleFileChange = (e) => {
-//     const { name, files: selectedFiles } = e.target;
-//     if (name === "transcripts") {
-//       setFiles((prev) => ({ ...prev, transcripts: selectedFiles }));
-//     } else {
-//       setFiles((prev) => ({ ...prev, [name]: selectedFiles[0] }));
-//     }
-//   };
-
-//   const handleSubmit = async (e) => {
-//     e.preventDefault();
-//     setSaving(true);
-//     setError("");
-//     setSuccess("");
-
-//     try {
-//       const token = localStorage.getItem("researcherToken");
-//       if (!token) throw new Error("Not authorized");
-
-//       const form = new FormData();
-//       Object.keys(formData).forEach((key) => form.append(key, formData[key]));
-
-//       if (files.profileImage) form.append("profileImage", files.profileImage);
-//       if (files.cv) form.append("cvFile", files.cv); // match backend field name
-//       if (files.transcripts.length > 0) {
-//         Array.from(files.transcripts).forEach((file) => form.append("transcripts", file));
-//       }
-
-//       const res = await fetch(`${API_BASE_URL}/researchers/profile`, {
-//         method: "PUT",
-//         headers: { Authorization: `Bearer ${token}` },
-//         body: form,
-//       });
-
-//       const data = await res.json();
-//       if (!res.ok) throw new Error(data.message || "Failed to update profile");
-
-//       setSuccess("Profile updated successfully!");
-//       fetchProfile(); // Refresh profile
-//     } catch (err) {
-//       setError(err.message || "Failed to update profile");
-//     } finally {
-//       setSaving(false);
-//     }
-//   };
-
-//   if (loading)
-//     return (
-//       <>
-//         <DashboardHeader auth={auth} setAuth={setAuth} />
-//         <Container className="my-5 text-center">
-//           <Spinner animation="border" /> <p>Loading profile...</p>
-//         </Container>
-//         <DashboardFooter />
-//       </>
-//     );
-
-//   return (
-//     <>
-//       <DashboardHeader auth={auth} setAuth={setAuth} />
-//       <Container className="my-5">
-//         <Row>
-//           <Col md={4}>
-//             <Card className="p-3 text-center shadow-sm">
-//               <Image
-//                 src={profile?.profileImage ? `http://localhost:5000${profile.profileImage}` : "/default-avatar.png"}
-//                 roundedCircle
-//                 width={150}
-//                 height={150}
-//                 className="mb-3"
-//               />
-//               <h5>{profile?.fullName || "N/A"}</h5>
-//               <p className="text-muted">{profile?.degree || "N/A"}</p>
-//               <p>
-//                 Domains:{" "}
-//                 {profile?.domains?.length > 0
-//                   ? profile.domains.map((d, idx) => (
-//                       <Badge key={idx} bg="info" className="me-1">
-//                         {d}
-//                       </Badge>
-//                     ))
-//                   : "N/A"}
-//               </p>
-//             </Card>
-//           </Col>
-
-//           <Col md={8}>
-//             <Card className="p-3 shadow-sm">
-//               <h5>Edit Profile</h5>
-//               {error && <Alert variant="danger">{error}</Alert>}
-//               {success && <Alert variant="success">{success}</Alert>}
-
-//               <Form onSubmit={handleSubmit} encType="multipart/form-data">
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Full Name</Form.Label>
-//                   <Form.Control type="text" name="fullName" value={formData.fullName} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Email (read-only)</Form.Label>
-//                   <Form.Control type="email" name="email" value={formData.email} readOnly />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Degree</Form.Label>
-//                   <Form.Control type="text" name="degree" value={formData.degree} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Domains (comma separated)</Form.Label>
-//                   <Form.Control
-//                     type="text"
-//                     name="domains"
-//                     value={formData.domains.join(", ")}
-//                     onChange={(e) =>
-//                       setFormData((prev) => ({
-//                         ...prev,
-//                         domains: e.target.value.split(",").map((d) => d.trim()),
-//                       }))
-//                     }
-//                   />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>LinkedIn</Form.Label>
-//                   <Form.Control type="text" name="linkedin" value={formData.linkedin} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Scopus</Form.Label>
-//                   <Form.Control type="text" name="scopus" value={formData.scopus} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Google Scholar</Form.Label>
-//                   <Form.Control type="text" name="googleScholar" value={formData.googleScholar} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Skills</Form.Label>
-//                   <Form.Control type="text" name="skills" value={formData.skills} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Awards</Form.Label>
-//                   <Form.Control type="text" name="awards" value={formData.awards} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Collaborations</Form.Label>
-//                   <Form.Control type="text" name="collaborations" value={formData.collaborations} onChange={handleChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Profile Image</Form.Label>
-//                   <Form.Control type="file" name="profileImage" accept="image/*" onChange={handleFileChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>CV</Form.Label>
-//                   <Form.Control type="file" name="cv" accept=".pdf,.doc,.docx" onChange={handleFileChange} />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-2">
-//                   <Form.Label>Transcripts</Form.Label>
-//                   <Form.Control type="file" name="transcripts" multiple accept=".pdf,.doc,.docx" onChange={handleFileChange} />
-//                 </Form.Group>
-
-//                 <Button type="submit" className="mt-3" disabled={saving}>
-//                   {saving ? "Saving..." : "Save Changes"}
-//                 </Button>
-//               </Form>
-//             </Card>
-//           </Col>
-//         </Row>
-//       </Container>
-//       <DashboardFooter />
-//     </>
-//   );
-// };
-
-// export default ResearcherProfile;
-
-// import React, { useState, useEffect } from "react";
-// import { Container, Row, Col, Form, Button, Card, Alert } from "react-bootstrap";
-// import DashboardHeader from "../components/layout/DashboardHeader";
-// import DashboardFooter from "../components/layout/DashboardFooter";
-
-// const ResearcherProfile = () => {
-//   const [profile, setProfile] = useState(null);
-//   const [message, setMessage] = useState("");
-//   const [error, setError] = useState("");
-//   const [loading, setLoading] = useState(true);
-//   const [updating, setUpdating] = useState(false);
-
-//   // Fetch researcher profile
-//   useEffect(() => {
-//     const fetchProfile = async () => {
-//       try {
-//         const token = localStorage.getItem("researcherToken");
-//         if (!token) {
-//           setError("Authentication required. Please log in again.");
-//           setLoading(false);
-//           return;
-//         }
-
-//         const res = await fetch("http://localhost:5000/api/researchers/profile", {
-//           headers: { Authorization: `Bearer ${token}` },
-//         });
-
-//         const data = await res.json();
-//         if (data.success) {
-//           setProfile(data.data);
-//         } else {
-//           setError(data.message || "Failed to load profile");
-//         }
-//       } catch (err) {
-//         console.error(err);
-//         setError("Error fetching profile");
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-
-//     fetchProfile();
-//   }, []);
-
-//   // Handle form input changes
-//   const handleChange = (e) => {
-//     setProfile({ ...profile, [e.target.name]: e.target.value });
-//   };
-
-//   // Handle file uploads
-//   const handleFileChange = (e) => {
-//     setProfile({ ...profile, [e.target.name]: e.target.files[0] });
-//   };
-
-//   // Update researcher profile
-//   const handleUpdate = async (e) => {
-//     e.preventDefault();
-//     setUpdating(true);
-//     setMessage("");
-//     setError("");
-
-//     try {
-//       const token = localStorage.getItem("researcherToken");
-//       const formData = new FormData();
-
-//       for (let key in profile) {
-//         if (profile[key]) formData.append(key, profile[key]);
-//       }
-
-//       const res = await fetch("http://localhost:5000/api/researchers/profile", {
-//         method: "PUT",
-//         headers: { Authorization: `Bearer ${token}` },
-//         body: formData,
-//       });
-
-//       const data = await res.json();
-//       if (data.success) {
-//         setMessage("Profile updated successfully!");
-//         setProfile(data.data);
-//       } else {
-//         setError(data.message || "Update failed");
-//       }
-//     } catch (err) {
-//       console.error(err);
-//       setError("Error updating profile");
-//     } finally {
-//       setUpdating(false);
-//     }
-//   };
-
-//   if (loading) {
-//     return (
-//       <>
-//         <DashboardHeader />
-//         <Container className="py-5 text-center">
-//           <h5>Loading profile...</h5>
-//         </Container>
-//         <DashboardFooter />
-//       </>
-//     );
-//   }
-
-//   if (error) {
-//     return (
-//       <>
-//         <DashboardHeader />
-//         <Container className="py-5 text-center">
-//           <Alert variant="danger">{error}</Alert>
-//         </Container>
-//         <DashboardFooter />
-//       </>
-//     );
-//   }
-
-//   if (!profile) {
-//     return (
-//       <>
-//         <DashboardHeader />
-//         <Container className="py-5 text-center">
-//           <Alert variant="warning">No profile data found.</Alert>
-//         </Container>
-//         <DashboardFooter />
-//       </>
-//     );
-//   }
-
-//   return (
-//     <>
-//       <DashboardHeader />
-//       <Container className="py-5">
-//         <Row className="justify-content-center">
-//           <Col md={8}>
-//             <Card className="shadow-lg p-4 rounded-4">
-//               <h3 className="mb-4 text-center">Researcher Profile</h3>
-
-//               {message && <Alert variant="success">{message}</Alert>}
-//               {error && <Alert variant="danger">{error}</Alert>}
-
-//               <Form onSubmit={handleUpdate}>
-//                 <Form.Group className="mb-3">
-//                   <Form.Label>Full Name</Form.Label>
-//                   <Form.Control
-//                     type="text"
-//                     name="fullName"
-//                     value={profile.fullName || ""}
-//                     onChange={handleChange}
-//                     required
-//                   />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-3">
-//                   <Form.Label>Email</Form.Label>
-//                   <Form.Control
-//                     type="email"
-//                     name="email"
-//                     value={profile.email || ""}
-//                     onChange={handleChange}
-//                     disabled
-//                   />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-3">
-//                   <Form.Label>Institution</Form.Label>
-//                   <Form.Control
-//                     type="text"
-//                     name="institution"
-//                     value={profile.institution || ""}
-//                     onChange={handleChange}
-//                   />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-3">
-//                   <Form.Label>Profile Image</Form.Label>
-//                   <Form.Control
-//                     type="file"
-//                     name="profileImage"
-//                     accept="image/*"
-//                     onChange={handleFileChange}
-//                   />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-3">
-//                   <Form.Label>CV File</Form.Label>
-//                   <Form.Control
-//                     type="file"
-//                     name="cvFile"
-//                     accept=".pdf,.doc,.docx"
-//                     onChange={handleFileChange}
-//                   />
-//                 </Form.Group>
-
-//                 <Form.Group className="mb-3">
-//                   <Form.Label>Transcripts</Form.Label>
-//                   <Form.Control
-//                     type="file"
-//                     name="transcripts"
-//                     multiple
-//                     accept=".pdf,.doc,.docx"
-//                     onChange={handleFileChange}
-//                   />
-//                 </Form.Group>
-
-//                 <div className="text-center">
-//                   <Button type="submit" variant="primary" disabled={updating}>
-//                     {updating ? "Updating..." : "Update Profile"}
-//                   </Button>
-//                 </div>
-//               </Form>
-//             </Card>
-//           </Col>
-//         </Row>
-//       </Container>
-//       <DashboardFooter />
-//     </>
-//   );
-// };
-
-// export default ResearcherProfile;
-
-// src/pages/researcher/ResearcherProfile.jsx
 import React, { useState, useEffect } from "react";
-import { 
-  Container, 
-  Row, 
-  Col, 
-  Card, 
-  Button, 
-  Form, 
-  Badge, 
-  Spinner, 
-  Alert,
-  Modal 
-} from "react-bootstrap";
+import {Container,Row,Col,Card,Button,Form,Badge,Spinner,Alert,Modal,Nav}from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
-import { 
-  User, 
-  Mail, 
-  Award, 
-  BookOpen, 
-  Users, 
-  Linkedin, 
-  FileText,
-  Edit,
-  Save,
-  X
-} from "lucide-react";
-import DashboardHeader from "../components/layout/DashboardHeader";
-import DashboardFooter from "../components/layout/DashboardFooter";
+import {User,Mail,Award,BookOpen,Users,Linkedin,FileText,Edit,Save,X} from "lucide-react";
+import { HouseDoor, FileEarmarkText, PersonCircle, BoxArrowRight } from 'react-bootstrap-icons';
 
 const ResearcherProfile = () => {
   const [loading, setLoading] = useState(true);
@@ -794,6 +35,7 @@ const ResearcherProfile = () => {
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('profile');
 
   useEffect(() => {
     fetchProfile();
@@ -993,27 +235,70 @@ const ResearcherProfile = () => {
 
   if (loading) {
     return (
-      <>
-        <DashboardHeader />
-        <Container className="my-5 text-center">
-          <Spinner animation="border" variant="primary" />
-          <p className="mt-3">Loading profile...</p>
-        </Container>
-        <DashboardFooter/>
-      </>
+      <div className="text-center p-5">
+        <Spinner animation="border" />
+        <p className="mt-3">Loading profile...</p>
+      </div>
     );
   }
 
   return (
-    <>
-      <DashboardHeader />
-      <Container className="my-4">
+    <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
+      {/* Sidebar */}
+      <div
+        className="d-flex flex-column text-white position-relative"
+        style={{ width: '280px', minHeight: '100vh', backgroundColor: '#00798c' , borderRight: '1px solid #e2e8f0', boxShadow: '2px 0 10px rgba(0,0,0,0.05)' }}
+      >
+        <div className="text-center px-3 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.15)' }}>
+          <div className="bg-white rounded-circle mx-auto mb-3 shadow-sm d-flex align-items-center justify-content-center" style={{ width: 70, height: 70 }}>
+            <img src="/emblem.png" alt="Logo" style={{ width: 48, height: 48 }} />
+          </div>
+          <h5 className="fw-bold mb-1 text-white">Researcher Panel</h5>
+          <small className="text-light">Ministry of Science & Technology<br/>Sri Lanka</small>
+        </div>
+        <Nav className="flex-column flex-grow-1 px-2 mt-3">
+          <Nav.Link
+            className={`text-white d-flex align-items-center gap-2 my-1 p-2 rounded ${activeTab === 'profile' ? 'fw-bold bg-white bg-opacity-10' : ''}`}
+            onClick={() => setActiveTab('profile')}
+            style={{ transition: '0.2s' }}
+          >
+            <PersonCircle />
+            <span>Profile</span>
+          </Nav.Link>
+          <div className="mt-auto pt-3 border-top">
+            <Nav.Link
+              className="d-flex align-items-center py-3 px-3 rounded-3"
+              style={{ color: '#dc3545', transition: '0.2s', cursor: 'pointer' }}
+              onClick={() => {
+                localStorage.removeItem('researcherToken');
+                localStorage.removeItem('researcherInfo');
+                navigate('/researcher/auth');
+              }}
+            >
+              <BoxArrowRight size={20} className="me-3" />
+              <span>Logout</span>
+            </Nav.Link>
+            <Nav.Link
+              className="d-flex align-items-center py-3 px-3 rounded-3 mt-2"
+              style={{ color: '#f8fafc', transition: '0.2s', cursor: 'pointer' }}
+              onClick={() => navigate(-1)}
+            >
+              <BoxArrowRight size={20} className="me-3" style={{ transform: 'rotate(180deg)' }} />
+              <span>Go Back</span>
+            </Nav.Link>
+          </div>
+        </Nav>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-grow-1 p-4">
+      <Container className="my-0" style={{ backgroundColor: 'transparent' }}>
         {/* Banner Header (match supervisor style) */}
         <Card className="mb-4 border-0 shadow-sm" style={{ borderRadius: 12 }}>
           <div
             className="p-4 text-white"
             style={{
-              background: "linear-gradient(90deg, #0d6efd 0%, #0aa2c0 100%)",
+              background: "linear-gradient(135deg, #0d3b66, #00798c)",
               borderTopLeftRadius: 12,
               borderTopRightRadius: 12,
             }}
@@ -1047,7 +332,7 @@ const ResearcherProfile = () => {
         <Row>
           <Col lg={4} className="mb-4">
             {/* Profile Card */}
-            <Card className="shadow">
+            <Card className="shadow border-0">
               <Card.Body className="text-center">
                 <div className="mb-3 d-flex flex-column align-items-center">
                   {profile?.profilePhoto ? (
@@ -1102,8 +387,8 @@ const ResearcherProfile = () => {
             </Card>
 
             {/* Links Card */}
-            <Card className="shadow mt-3">
-              <Card.Header className="bg-light">
+            <Card className="shadow mt-3 border-0">
+              <Card.Header className="text-white" style={{ background: 'linear-gradient(135deg, #0d3b66, #00798c)' }}>
                 <h6 className="mb-0">Academic Links</h6>
               </Card.Header>
               <Card.Body>
@@ -1138,8 +423,8 @@ const ResearcherProfile = () => {
           <Col lg={8}>
             {isEditing ? (
               /* Edit Form */
-              <Card className="shadow">
-                <Card.Header className="bg-primary text-white">
+              <Card className="shadow border-0">
+                <Card.Header className="text-white" style={{ background: 'linear-gradient(135deg, #0d3b66, #00798c)' }}>
                   <h5 className="mb-0">Edit Profile</h5>
                 </Card.Header>
                 <Card.Body>
@@ -1295,8 +580,8 @@ const ResearcherProfile = () => {
             ) : (
               /* View Profile */
               <>
-                <Card className="shadow mb-3">
-                  <Card.Header className="bg-light">
+                <Card className="shadow mb-3 border-0">
+                  <Card.Header className="text-white" style={{ background: 'linear-gradient(135deg, #0d3b66, #00798c)' }}>
                     <h5 className="mb-0">Basic Information</h5>
                   </Card.Header>
                   <Card.Body>
@@ -1322,8 +607,8 @@ const ResearcherProfile = () => {
                 </Card>
 
                 {/* Skills Section */}
-                <Card className="shadow mb-3">
-                  <Card.Header className="d-flex justify-content-between align-items-center bg-light">
+                <Card className="shadow mb-3 border-0">
+                  <Card.Header className="d-flex justify-content-between align-items-center text-white" style={{ background: 'linear-gradient(135deg, #0d3b66, #00798c)' }}>
                     <h5 className="mb-0">Skills</h5>
                     {!skillsEdit ? (
                       <Button size="sm" variant="outline-primary" onClick={() => setSkillsEdit(true)}>
@@ -1394,8 +679,8 @@ const ResearcherProfile = () => {
                 </Card>
                 
                 {/* Awards Section */}
-                <Card className="shadow mb-3">
-                  <Card.Header className="d-flex justify-content-between align-items-center bg-light">
+                <Card className="shadow mb-3 border-0">
+                  <Card.Header className="d-flex justify-content-between align-items-center text-white" style={{ background: 'linear-gradient(135deg, #0d3b66, #00798c)' }}>
                     <h5 className="mb-0">Awards</h5>
                     {!awardsEdit ? (
                       <Button size="sm" variant="outline-primary" onClick={() => setAwardsEdit(true)}>
@@ -1465,8 +750,8 @@ const ResearcherProfile = () => {
                 </Card>
 
                 {/* Qualifications Section */}
-                <Card className="shadow mb-3">
-                  <Card.Header className="d-flex justify-content-between align-items-center bg-light">
+                <Card className="shadow mb-3 border-0">
+                  <Card.Header className="d-flex justify-content-between align-items-center text-white" style={{ background: 'linear-gradient(135deg, #0d3b66, #00798c)' }}>
                     <h5 className="mb-0">Qualifications</h5>
                     {!qualsEdit ? (
                       <Button size="sm" variant="outline-primary" onClick={() => setQualsEdit(true)}>
@@ -1535,9 +820,9 @@ const ResearcherProfile = () => {
                   </Card.Body>
                 </Card>
                 {/* Danger Zone */}
-                <Card className="shadow mb-3">
-                  <Card.Header className="bg-white d-flex justify-content-between align-items-center">
-                    <h6 className="mb-0 text-danger">Danger Zone</h6>
+                <Card className="shadow mb-3 border-0">
+                  <Card.Header className="text-white" style={{ background: 'linear-gradient(135deg, #b91c1c, #ef4444)' }}>
+                    <h6 className="mb-0">Danger Zone</h6>
                   </Card.Header>
                   <Card.Body>
                     <p className="text-muted mb-2" style={{fontSize: 14}}>This action will permanently delete your profile and associated data.</p>
@@ -1547,8 +832,8 @@ const ResearcherProfile = () => {
                   </Card.Body>
                 </Card>
 
-                <Card className="shadow">
-                  <Card.Header className="bg-light">
+                <Card className="shadow border-0">
+                  <Card.Header className="text-white" style={{ background: 'linear-gradient(135deg, #0d3b66, #00798c)' }}>
                     <h5 className="mb-0">Research Projects</h5>
                   </Card.Header>
                   <Card.Body>
@@ -1595,8 +880,8 @@ const ResearcherProfile = () => {
           </Button>
         </Modal.Footer>
       </Modal>
-      <DashboardFooter/>
-    </>
+      </div>
+    </div>
   );
 }
 export default ResearcherProfile;

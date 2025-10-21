@@ -14,7 +14,8 @@ const SupervisionSchema = new mongoose.Schema(
     feedbacks: [FeedbackSchema],
     durationMonths: { type: Number },
     fundingRequested: { type: Boolean, default: false }, // Add this
-feasibility: { type: String, enum: ["Feasible", "Not Feasible", null], default: null },
+    feasibility: { type: String, enum: ["Feasible", "Not Feasible", null], default: null },
+    verifiedByMinistry: { type: Boolean, default: false },
 
   },
   { timestamps: true }

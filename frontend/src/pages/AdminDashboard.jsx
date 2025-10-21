@@ -1,42 +1,8 @@
 import React, { useState } from 'react';
 
-import { 
-  Container, 
-  Row, 
-  Col, 
-  Card, 
-  Nav, 
-  Button, 
-  Badge,
-  ProgressBar,
-  ListGroup
-} from 'react-bootstrap';
-import { 
-  LayoutSidebar, 
-  HouseDoor, 
-  People, 
-  FileEarmarkText, 
-  CurrencyDollar, 
-  Gear, 
-  BoxArrowRight,
-  GraphUp,
-  Calendar,
-  Envelope,
-  Bell,
-  Search,
-  PersonCircle,
-  ThreeDotsVertical,
-  ArrowUp,
-  ArrowDown,
-  PersonCheck, 
-  Cash,
-  PersonPlus,
-  PersonX,
-  FileText,
-  Clock,
-  FileEarmarkArrowDown as FileExport,
-  ArrowRepeat as RefreshCw
-} from 'react-bootstrap-icons';
+import {Container,Row,Col,Card,Nav,Button,Badge,ProgressBar,ListGroup} from 'react-bootstrap';
+import {LayoutSidebar,HouseDoor,People,FileEarmarkText,CurrencyDollar, 
+  Gear,BoxArrowRight,GraphUp,Calendar,Envelope,Bell,Search,PersonCircle,ThreeDotsVertical,ArrowUp,ArrowDown,PersonCheck, Cash,PersonPlus,PersonX,FileText,Clock,FileEarmarkArrowDown as FileExport,ArrowRepeat as RefreshCw} from 'react-bootstrap-icons';
 import SupervisorApprovals from './admin/SupervisorApprovals';
 import ResearchManagement from './admin/ResearchManagement';
 import FundingReview from './admin/FundingReview';
@@ -142,7 +108,7 @@ const AdminDashboard = ({ auth, setAuth }) => {
           height: '100vh',
           zIndex: 100,
           overflowY: 'auto',
-          backgroundColor: '#0d3b66',
+          backgroundColor: '#00798c',
           borderRight: `1px solid #e2e8f0`,
           boxShadow: '2px 0 10px rgba(0,0,0,0.05)'
         }}
@@ -204,6 +170,20 @@ const AdminDashboard = ({ auth, setAuth }) => {
             >
               <BoxArrowRight size={20} className="me-3" />
               {sidebarOpen && <span>Logout</span>}
+            </Nav.Link>
+            <Nav.Link
+             className="d-flex align-items-center py-3 px-3 rounded-3 mt-2"
+             style={{ color: "#f8fafc", transition: "0.2s", cursor: "pointer" }}
+             onClick={() => {
+             navigate(-1); // navigate backward
+            }}
+                        >
+            <BoxArrowRight
+             size={20}
+             className="me-3"
+             style={{ transform: "rotate(180deg)" }}
+             />
+            <span>Go Back</span>
             </Nav.Link>
           </div>
         </Nav>

@@ -693,4 +693,5 @@ const seedResearchers = async () => {
   }
 };
 
-seedResearchers();
+// Seeding is disabled by default. To seed manually, uncomment the line below.
+// seedResearchers();

@@ -89,6 +89,9 @@ const supervisorSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Password reset
+    passwordResetToken: { type: String, default: null, select: false },
+    passwordResetExpires: { type: Date, default: null, select: false },
 
     // ✅ Security tracking
     loginAttempts: { type: Number, default: 0 },
@@ -129,6 +132,7 @@ const supervisorSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    linkedin: { type: String, trim: true },
     googleScholar: { type: String, trim: true },
     scopus: { type: String, trim: true },
 

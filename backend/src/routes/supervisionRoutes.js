@@ -111,14 +111,38 @@
 
 // // ------------------- Supervisor updates request (approve/deny/feedback) -------------------
 // router.put("/update/:id", verifyToken, async (req, res) => {
-//   const { status, feedback } = req.body;
+//   const { status, feedback, feasibility, reason } = req.body;
 
 //   try {
 //     const supervision = await Supervision.findById(req.params.id);
 //     if (!supervision)
 //       return res.status(404).json({ message: "Supervision not found" });
 
+//     // If attempting to approve to Current, enforce capacity limit of 5
+//     if (status === "Current") {
+//       const activeCount = await Supervision.countDocuments({
+//         supervisor: supervision.supervisor,
+//         status: "Current",
+//       });
+//       if (activeCount >= 5) {
+//         return res.status(400).json({ message: "Supervisor has reached maximum active supervisions (5)." });
+//       }
+//     }
+
 //     if (status) supervision.status = status;
+
+//     // Optional feasibility update (used by supervisor to indicate funding viability)
+//     if (typeof feasibility !== 'undefined' && feasibility !== null) {
+//       const allowed = ["Feasible", "Not Feasible", null];
+//       if (!allowed.includes(feasibility)) {
+//         return res.status(400).json({ message: "Invalid feasibility value" });
+//       }
+//       supervision.feasibility = feasibility;
+//       // Optionally record a note as feedback when a reason is provided
+//       if (reason && typeof reason === 'string' && reason.trim()) {
+//         supervision.feedbacks.push({ comment: `Funding decision: ${feasibility}. ${reason.trim()}`, date: new Date() });
+//       }
+//     }
 
 //     if (feedback) {
 //       supervision.feedbacks.push({
@@ -274,7 +298,7 @@ router.get("/requests", verifyToken, async (req, res) => {
     if (req.role !== "Supervisor")
       return res.status(403).json({ message: "Access denied" });
 
-    const requests = await Supervision.find({ supervisor: req.userId })
+    const requests = await Supervision.find({ supervisor: req.userId, verifiedByMinistry: true })
       .populate("researcher", "name email field")
       .sort({ createdAt: -1 });
 
@@ -287,14 +311,44 @@ router.get("/requests", verifyToken, async (req, res) => {
 
 // ------------------- Supervisor updates request (approve/deny/feedback) -------------------
 router.put("/update/:id", verifyToken, async (req, res) => {
-  const { status, feedback } = req.body;
+  const { status, feedback, feasibility, reason, removeFeedbackIndex } = req.body;
 
   try {
     const supervision = await Supervision.findById(req.params.id);
     if (!supervision)
       return res.status(404).json({ message: "Supervision not found" });
 
+    // If attempting to approve to Current, enforce capacity limit of 5
+    if (status === "Current") {
+      const activeCount = await Supervision.countDocuments({
+        supervisor: supervision.supervisor,
+        status: "Current",
+      });
+      if (activeCount >= 5) {
+        return res.status(400).json({ message: "Supervisor has reached maximum active supervisions (5)." });
+      }
+    }
+
     if (status) supervision.status = status;
+
+    // Optional feasibility update (used by supervisor to indicate funding viability)
+    if (typeof feasibility !== 'undefined' && feasibility !== null) {
+      const allowed = ["Feasible", "Not Feasible", null];
+      if (!allowed.includes(feasibility)) {
+        return res.status(400).json({ message: "Invalid feasibility value" });
+      }
+      supervision.feasibility = feasibility;
+      // Optionally record a note as feedback when a reason is provided
+      if (reason && typeof reason === 'string' && reason.trim()) {
+        supervision.feedbacks.push({ comment: `Funding decision: ${feasibility}. ${reason.trim()}`, date: new Date() });
+      }
+    }
+
+    if (typeof removeFeedbackIndex === 'number') {
+      if (removeFeedbackIndex >= 0 && removeFeedbackIndex < (supervision.feedbacks?.length || 0)) {
+        supervision.feedbacks.splice(removeFeedbackIndex, 1);
+      }
+    }
 
     if (feedback) {
       supervision.feedbacks.push({
@@ -305,9 +359,49 @@ router.put("/update/:id", verifyToken, async (req, res) => {
 
     await supervision.save();
 
+    // After update, adjust supervisor availability based on active current count
+    try {
+      const currentCount = await Supervision.countDocuments({
+        supervisor: supervision.supervisor,
+        status: "Current",
+      });
+      const sup = await Supervisor.findById(supervision.supervisor);
+      if (sup) {
+        const desired = currentCount >= 5 ? "Unavailable" : "Available";
+        if (sup.availability !== desired) {
+          sup.availability = desired;
+          await sup.save();
+        }
+      }
+    } catch (e) {
+      console.error("Availability update error:", e);
+    }
+
     res.json({ message: "Supervision updated successfully.", supervision });
   } catch (err) {
     console.error("PUT /supervision/update error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ------------------- Supervisor declines a pending request -------------------
+router.delete("/:id", verifyToken, async (req, res) => {
+  try {
+    if (req.role !== "Supervisor") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const supervision = await Supervision.findById(req.params.id);
+    if (!supervision) return res.status(404).json({ message: "Supervision not found" });
+    if (String(supervision.supervisor) !== String(req.userId)) {
+      return res.status(403).json({ message: "Not your supervision" });
+    }
+    if (supervision.status !== "Pending") {
+      return res.status(400).json({ message: "Only pending requests can be declined" });
+    }
+    await supervision.deleteOne();
+    return res.json({ message: "Supervision request declined and removed" });
+  } catch (err) {
+    console.error("DELETE /supervisions/:id error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

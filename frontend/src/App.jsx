@@ -1,20 +1,4 @@
 // // src/App.jsx
-// import React, { useState, useEffect } from "react";
-// import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-
-// // Common / Landing Page
-// import AboutPage from "./pages/AboutPage";
-
-// // Supervisor Pages
-// import SupervisorAuth from "./pages/SupervisorAuth";
-// import SupervisorDashboard from "./pages/SupervisorDashboard";
-// import SupervisorProfile from "./pages/SupervisorProfile";
-// import FundingRequests from "./pages/FundingRequests";
-
-// // Admin Pages
-// import AdminAuth from "./pages/AdminAuth";
-// import AdminDashboard from "./pages/AdminDashboard";
-
 // // Researcher Pages
 // import ResearcherAuth from "./pages/ResearcherAuth";
 // import ResearcherDashboard from "./pages/ResearcherDashboard";
@@ -197,6 +181,7 @@ import SupervisorAuth from "./pages/SupervisorAuth";
 import SupervisorDashboard from "./pages/SupervisorDashboard";
 import SupervisorProfile from "./pages/SupervisorProfile";
 import FundingRequests from "./pages/FundingRequests";
+import SupervisorFeedback from "./pages/SupervisorFeedback";
 
 // Admin Pages
 import AdminAuth from "./pages/AdminAuth";
@@ -308,6 +293,12 @@ const App = () => {
           path="/supervisor/funding-requests"
           element={
             auth.supervisor ? <FundingRequests auth={auth} setAuth={setAuth} /> : <Navigate to="/supervisor/auth?mode=login" />
+          }
+        />
+        <Route
+          path="/supervisor/feedback"
+          element={
+            auth.supervisor ? <SupervisorFeedback /> : <Navigate to="/supervisor/auth?mode=login" />
           }
         />
 

@@ -16,6 +16,14 @@ const adminSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  passwordResetToken: {
+    type: String,
+    default: null,
+  },
+  passwordResetExpires: {
+    type: Date,
+    default: null,
+  },
 });
 
 const Admin = mongoose.model("Admin", adminSchema);

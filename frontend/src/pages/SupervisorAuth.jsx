@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Form, Button, Container, Row, Col, Card } from "react-bootstrap";
+import { Form, Button, Container, Row, Col, Card, Modal } from "react-bootstrap";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Users, Building, Mail, Lock, Phone, MapPin, Award, BookOpen, FileText, Briefcase } from "lucide-react";
-import SimpleHeader from "../components/layout/SimpleHeader";
-import SimpleFooter from "../components/layout/SimpleFooter";
 import Message from "../components/common/Message";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -25,6 +23,8 @@ const SupervisorAuth = ({ setAuth }) => {
   const [affiliation, setAffiliation] = useState("");
   const [experience, setExperience] = useState("");
   const [domains, setDomains] = useState([]);
+  const [linkedin, setLinkedin] = useState("");
+  const [googleScholar, setGoogleScholar] = useState("");
   
   const domainOptions = [
     "Information Technology",
@@ -46,6 +46,14 @@ const SupervisorAuth = ({ setAuth }) => {
   const [cvFile, setCvFile] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  // Forgot password state
+  const [showForgot, setShowForgot] = useState(false);
+  const [fpStep, setFpStep] = useState(1); // 1=request, 2=reset
+  const [fpEmail, setFpEmail] = useState("");
+  const [fpToken, setFpToken] = useState("");
+  const [fpPassword, setFpPassword] = useState("");
+  const [fpLoading, setFpLoading] = useState(false);
+  const [fpMsg, setFpMsg] = useState("");
 
   useEffect(() => {
     setIsLogin(modeFromQuery !== "register");
@@ -70,6 +78,61 @@ const SupervisorAuth = ({ setAuth }) => {
     setCvFile(null);
     setError("");
     setSuccess("");
+    setLinkedin("");
+    setGoogleScholar("");
+  };
+
+  // Forgot password handlers
+  const openForgot = () => {
+    setShowForgot(true);
+    setFpStep(1);
+    setFpEmail("");
+    setFpToken("");
+    setFpPassword("");
+    setFpMsg("");
+  };
+
+  const handleRequestReset = async () => {
+    setFpMsg("");
+    if (!fpEmail) { setFpMsg("Email is required"); return; }
+    try {
+      setFpLoading(true);
+      const res = await fetch(`${API_BASE_URL}/supervisors/request-reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: fpEmail })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to request reset');
+      setFpMsg('Reset token generated. Use the token below to set a new password.');
+      if (data.token) setFpToken(data.token);
+      setFpStep(2);
+    } catch (err) {
+      setFpMsg(err.message || 'Failed to request reset');
+    } finally {
+      setFpLoading(false);
+    }
+  };
+
+  const handleDoReset = async () => {
+    setFpMsg("");
+    if (!fpToken || !fpPassword) { setFpMsg('Token and new password are required'); return; }
+    try {
+      setFpLoading(true);
+      const res = await fetch(`${API_BASE_URL}/supervisors/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: fpToken, password: fpPassword })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to reset password');
+      setFpMsg('Password reset successful. You can now sign in.');
+      setTimeout(() => setShowForgot(false), 900);
+    } catch (err) {
+      setFpMsg(err.message || 'Failed to reset password');
+    } finally {
+      setFpLoading(false);
+    }
   };
 
   const toggleDomain = (domain) => {
@@ -294,6 +357,8 @@ const SupervisorAuth = ({ setAuth }) => {
         formData.append('experience', experience);
         formData.append('domains', JSON.stringify(domains));
         formData.append('studies', JSON.stringify(studies));
+        if (linkedin) formData.append('linkedin', linkedin.trim());
+        if (googleScholar) formData.append('googleScholar', googleScholar.trim());
         
         // Add CV file
         formData.append('cvFile', cvFile);
@@ -319,66 +384,34 @@ const SupervisorAuth = ({ setAuth }) => {
   };
 
   return (
-    <div className="min-vh-100 d-flex flex-column" style={{ backgroundColor: "#f8fafc" }}>
-      <SimpleHeader title={isLogin ? "Supervisor Portal Access" : "Supervisor Registration Portal"} />
-
-      <main className="flex-grow-1 d-flex align-items-center justify-content-center py-5">
-        <Container>
-          <Row className="justify-content-center">
-            <Col xs={12} md={10} lg={8} xl={6}>
-              {/* Professional Welcome Section */}
-              <div className="text-center mb-4">
-                <Card className="border-0 shadow-lg" style={{ background: "linear-gradient(135deg, #0d3b66 0%, #00798c 100%)" }}>
-                  <Card.Body className="text-white p-4">
-                    <div className="d-flex align-items-center justify-content-center">
-                      <Users className="me-3" size={32} />
-                      <div>
-                        <h2 className="h3 fw-bold mb-1">
-                          {isLogin ? "Supervisor Portal Access" : "Supervisor Registration"}
-                        </h2>
-                        <p className="mb-0 opacity-90">
-                          {isLogin ? "Access your supervision management portal" : "Join our research supervision network"}
-                        </p>
-                      </div>
-                    </div>
-                  </Card.Body>
-                </Card>
+    <div className="min-vh-100" style={{ backgroundColor: "#f5f7fb" }}>
+      <Container className="py-4">
+        <Row className="g-4 align-items-stretch">
+          <Col lg={6} xl={5}>
+            {error && (
+              <div className="mb-3">
+                <Message variant="danger">
+                  <div className="d-flex align-items-center"><FileText className="me-2" size={16} />{error}</div>
+                </Message>
               </div>
-
-              {/* Messages */}
-              {error && (
+            )}
+            {success && (
+              <div className="mb-3">
+                <Message variant="success">
+                  <div className="d-flex align-items-center"><FileText className="me-2" size={16} />{success}</div>
+                </Message>
+              </div>
+            )}
+            <Card className="shadow border-0" style={{ borderRadius: 16 }}>
+              <Card.Body className="p-4 p-md-5">
                 <div className="mb-4">
-                  <Message variant="danger">
-                    <div className="d-flex align-items-center">
-                      <FileText className="me-2" size={16} />
-                      {error}
-                    </div>
-                  </Message>
+                  <div className="d-inline-flex align-items-center justify-content-center rounded-circle" style={{ width: 56, height: 56, background: "linear-gradient(135deg, #0d3b66, #00798c)" }}>
+                    <Users size={28} color="#fff" />
+                  </div>
+                  <h3 className="fw-bold mt-3 mb-1" style={{ color: "#0d3b66" }}>{isLogin ? "Welcome Back" : "Create Supervisor Account"}</h3>
+                  <div className="text-muted">{isLogin ? "Sign in to your account" : "Fill in details to register"}</div>
                 </div>
-              )}
-
-              {success && (
-                <div className="mb-4">
-                  <Message variant="success">
-                    <div className="d-flex align-items-center">
-                      <FileText className="me-2" size={16} />
-                      {success}
-                    </div>
-                  </Message>
-                </div>
-              )}
-
-              {/* Main Form Card */}
-              <Card className="border-0 shadow-lg">
-                <Card.Header className="text-white py-4" style={{ background: "linear-gradient(135deg, #00798c 0%, #0d3b66 100%)" }}>
-                  <h5 className="fw-bold mb-0 d-flex align-items-center">
-                    <BookOpen className="me-2" size={20} />
-                    {isLogin ? "Supervisor Login Credentials" : "Official Registration Form"}
-                  </h5>
-                </Card.Header>
-
-                <Card.Body className="p-5">
-                  <Form onSubmit={handleSubmit}>
+                <Form onSubmit={handleSubmit}>
                     {!isLogin && (
                       <>
                         {/* Personal Information Section */}
@@ -638,6 +671,51 @@ const SupervisorAuth = ({ setAuth }) => {
                             </Form.Group>
                           </div>
 
+                          {/* LinkedIn and Google Scholar */}
+                          <div className="mb-4">
+                            <h6 className="fw-bold mb-3 pb-2" style={{ color: "#0d3b66", borderBottom: "2px solid #e2e8f0" }}>
+                              Professional Profiles
+                            </h6>
+
+                            <Row>
+                              <Col md={6}>
+                                <Form.Group className="mb-3">
+                                  <Form.Label className="fw-semibold d-flex align-items-center" style={{ color: "#0d3b66" }}>
+                                    <i className="bi bi-linkedin me-2" size={16} />
+                                    LinkedIn Profile
+                                  </Form.Label>
+                                  <Form.Control
+                                    type="text"
+                                    value={linkedin}
+                                    onChange={e => setLinkedin(e.target.value)}
+                                    className="form-control-lg"
+                                    style={{ borderColor: "#cbd5e1" }}
+                                    placeholder="https://www.linkedin.com/in/your-profile"
+                                    disabled={loading}
+                                  />
+                                </Form.Group>
+                              </Col>
+
+                              <Col md={6}>
+                                <Form.Group className="mb-3">
+                                  <Form.Label className="fw-semibold d-flex align-items-center" style={{ color: "#0d3b66" }}>
+                                    <i className="bi bi-google me-2" size={16} />
+                                    Google Scholar Profile
+                                  </Form.Label>
+                                  <Form.Control
+                                    type="text"
+                                    value={googleScholar}
+                                    onChange={e => setGoogleScholar(e.target.value)}
+                                    className="form-control-lg"
+                                    style={{ borderColor: "#cbd5e1" }}
+                                    placeholder="https://scholar.google.com/citations?user=your-profile"
+                                    disabled={loading}
+                                  />
+                                </Form.Group>
+                              </Col>
+                            </Row>
+                          </div>
+
                         </div>
                       </>
                     )}
@@ -685,6 +763,11 @@ const SupervisorAuth = ({ setAuth }) => {
                               placeholder="Enter secure password (min. 6 characters)"
                               minLength={6}
                             />
+                            {isLogin && (
+                              <div className="text-end mt-2">
+                                <Button variant="link" type="button" onClick={openForgot} className="p-0" style={{ color: "#00798c" }}>Forgot password?</Button>
+                              </div>
+                            )}
                             {!isLogin && (
                               <small className="text-muted mt-1 d-block">
                                 Password must be at least 6 characters long
@@ -695,46 +778,22 @@ const SupervisorAuth = ({ setAuth }) => {
                       </Row>
                     </div>
 
-                    {/* Submit Button */}
                     <div className="d-grid gap-2">
-                      <Button
-                        type="submit"
-                        size="lg"
-                        disabled={loading}
-                        className="py-3 fw-bold"
-                        style={{
-                          background: loading ? "#6c757d" : "linear-gradient(135deg, #0d3b66 0%, #00798c 100%)",
-                          border: "none",
-                          boxShadow: loading ? "none" : "0 4px 15px rgba(0, 121, 140, 0.3)",
-                          opacity: loading ? 0.7 : 1
-                        }}
-                      >
+                      <Button type="submit" size="lg" disabled={loading} className="py-3 fw-bold" style={{ background: loading ? "#6c757d" : "linear-gradient(90deg, #4c6ef5, #22c1c3)", border: "none" }}>
                         {loading ? (
                           <>
                             <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            {isLogin ? "Signing In..." : "Processing Registration..."}
+                            {isLogin ? "Signing In..." : "Creating..."}
                           </>
                         ) : (
-                          <>
-                            {isLogin ? "Access Supervisor Portal" : "Complete Registration"}
-                          </>
+                          isLogin ? "Sign In" : "Create Account"
                         )}
                       </Button>
-
-                      <div className="text-center mt-3">
-                        <Button
-                          variant="link"
-                          disabled={loading}
-                          onClick={() => {
-                            resetForm();
-                            navigate(`/supervisor/auth?mode=${isLogin ? "register" : "login"}`);
-                          }}
-                          className="text-decoration-none fw-semibold"
-                          style={{ color: loading ? "#6c757d" : "#00798c" }}
-                        >
-                          {isLogin ? "New supervisor? Register here" : "Already registered? Sign in"}
-                        </Button>
-                      </div>
+                    </div>
+                    <div className="text-center mt-3">
+                      <Button variant="link" type="button" onClick={() => { setIsLogin(!isLogin); resetForm(); }} disabled={loading}>
+                        {isLogin ? "New supervisor? Create account" : "Already registered? Sign in"}
+                      </Button>
                     </div>
 
                     {/* Additional Info for Registration */}
@@ -762,32 +821,27 @@ const SupervisorAuth = ({ setAuth }) => {
                   </Form>
                 </Card.Body>
               </Card>
-
-              {/* Footer Information */}
-              <div className="text-center mt-4">
-                <Card className="border-0" style={{ backgroundColor: "rgba(13, 59, 102, 0.05)" }}>
-                  <Card.Body className="py-3">
-                    <small style={{ color: "#64748b" }}>
-                      <Building className="me-1" size={14} />
-                      Official portal for research supervisors under the Ministry of Science & Technology, Sri Lanka
-                    </small>
-                  </Card.Body>
-                </Card>
-              </div>
-            </Col>
-          </Row>
-        </Container>
-      </main>
-
-      <SimpleFooter />
-
-      {/* Custom Professional Styling */}
+          </Col>
+          <Col lg={6} xl={7} className="d-none d-lg-block">
+            <div className="h-100 w-100 p-4 p-xl-5 text-white" style={{ borderRadius: 16, background: "linear-gradient(135deg, #5B86E5 0%, #36D1DC 100%)" }}>
+              <h2 className="fw-bold">Welcome Back to REPFMS</h2>
+              <p className="mb-4">Manage supervisions, review requests, and collaborate with researchers.</p>
+              <Row className="g-3 mb-4">
+                <Col md={6}><div className="p-3 rounded-3" style={{ background: "rgba(255,255,255,0.12)" }}><div className="fw-semibold">Track Requests</div><small>Manage incoming supervision requests</small></div></Col>
+                <Col md={6}><div className="p-3 rounded-3" style={{ background: "rgba(255,255,255,0.12)" }}><div className="fw-semibold">Domain Matching</div><small>Smart matches to your expertise</small></div></Col>
+                <Col md={6}><div className="p-3 rounded-3" style={{ background: "rgba(255,255,255,0.12)" }}><div className="fw-semibold">Project Insights</div><small>Overview of active projects</small></div></Col>
+                <Col md={6}><div className="p-3 rounded-3" style={{ background: "rgba(255,255,255,0.12)" }}><div className="fw-semibold">Community</div><small>Connect with peers</small></div></Col>
+              </Row>
+              <Row className="g-3">
+                <Col md={4}><div className="p-3 rounded-3 text-center" style={{ background: "rgba(255,255,255,0.18)" }}><div className="h4 mb-0">1.2k</div><small>Researchers</small></div></Col>
+                <Col md={4}><div className="p-3 rounded-3 text-center" style={{ background: "rgba(255,255,255,0.18)" }}><div className="h4 mb-0">320</div><small>Active Projects</small></div></Col>
+                <Col md={4}><div className="p-3 rounded-3 text-center" style={{ background: "rgba(255,255,255,0.18)" }}><div className="h4 mb-0">98%</div><small>Approval Rate</small></div></Col>
+              </Row>
+            </div>
+          </Col>
+        </Row>
+      </Container>
       <style jsx>{`
-        .form-control:focus {
-          border-color: #00798c !important;
-          box-shadow: 0 0 0 0.25rem rgba(0, 121, 140, 0.25) !important;
-        }
-        
         .btn:hover:not(:disabled) {
           transform: translateY(-2px);
           box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
@@ -838,6 +892,45 @@ const SupervisorAuth = ({ setAuth }) => {
           color: #6c757d !important;
         }
       `}</style>
+
+      {/* Forgot Password Modal */}
+      <Modal show={showForgot} onHide={() => setShowForgot(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title style={{ color: "#0d3b66" }}>{fpStep === 1 ? 'Forgot Password' : 'Reset Password'}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {fpMsg && (
+            <div className={`alert ${fpMsg.includes('successful') ? 'alert-success' : 'alert-warning'}`}>{fpMsg}</div>
+          )}
+          {fpStep === 1 ? (
+            <Form>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">Official Email</Form.Label>
+                <Form.Control type="email" value={fpEmail} onChange={e=>setFpEmail(e.target.value)} disabled={fpLoading} placeholder="supervisor@institution.edu.lk" />
+              </Form.Group>
+            </Form>
+          ) : (
+            <Form>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">Reset Token</Form.Label>
+                <Form.Control type="text" value={fpToken} onChange={e=>setFpToken(e.target.value)} disabled={fpLoading} />
+                <small className="text-muted">Provided here in development mode</small>
+              </Form.Group>
+              <Form.Group>
+                <Form.Label className="fw-semibold">New Password</Form.Label>
+                <Form.Control type="password" value={fpPassword} onChange={e=>setFpPassword(e.target.value)} disabled={fpLoading} />
+              </Form.Group>
+            </Form>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          {fpStep === 1 ? (
+            <Button onClick={handleRequestReset} disabled={fpLoading} style={{ background: '#00798c', border: 'none' }}>{fpLoading ? 'Please wait...' : 'Send Reset Link'}</Button>
+          ) : (
+            <Button onClick={handleDoReset} disabled={fpLoading} style={{ background: '#00798c', border: 'none' }}>{fpLoading ? 'Resetting...' : 'Reset Password'}</Button>
+          )}
+        </Modal.Footer>
+      </Modal>
     </div>
     
   );

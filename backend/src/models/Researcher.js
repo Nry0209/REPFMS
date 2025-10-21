@@ -99,6 +99,16 @@ const researcherSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Research",
     },
+    passwordResetToken: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    passwordResetExpires: {
+      type: Date,
+      default: null,
+      select: false,
+    },
   },
   {
     timestamps: true,
