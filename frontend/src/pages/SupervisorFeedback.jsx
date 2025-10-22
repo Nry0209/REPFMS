@@ -299,6 +299,62 @@ const SupervisorFeedback = ({ auth, setAuth }) => {
     }
   };
 
+  // Approve pending (move to Current)
+  const approvePending = async (id) => {
+    try {
+      setSaving((prev) => ({ ...prev, [id]: true }));
+      const token = localStorage.getItem("supervisorToken");
+      const res = await fetch(`http://localhost:5000/api/supervisions/update/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: "Current" }),
+      });
+      const data = await res.json();
+      if (data?.supervision) setRequests((prev) => prev.map((r) => (r._id === id ? data.supervision : r)));
+    } catch (e) {
+      console.error("Failed to approve request", e);
+    } finally {
+      setSaving((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  // Reject pending (delete)
+  const rejectPending = async (id) => {
+    try {
+      setSaving((prev) => ({ ...prev, [id]: true }));
+      const token = localStorage.getItem("supervisorToken");
+      const res = await fetch(`http://localhost:5000/api/supervisions/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setRequests((prev) => prev.filter((r) => r._id !== id));
+    } catch (e) {
+      console.error("Failed to reject request", e);
+    } finally {
+      setSaving((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  // Feasibility actions
+  const setFeasibility = async (id, feasible) => {
+    try {
+      setSaving((prev) => ({ ...prev, [id]: true }));
+      const token = localStorage.getItem("supervisorToken");
+      const payload = { feasibility: feasible ? "Feasible" : "Not Feasible" };
+      const res = await fetch(`http://localhost:5000/api/supervisions/update/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data?.supervision) setRequests((prev) => prev.map((r) => (r._id === id ? data.supervision : r)));
+    } catch (e) {
+      console.error("Failed to set feasibility", e);
+    } finally {
+      setSaving((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
   const statusBadge = (status) => {
     const map = {
       Pending: "warning",
@@ -439,6 +495,13 @@ const SupervisorFeedback = ({ auth, setAuth }) => {
                         <div className="small text-muted mt-1">
                           Researcher: {r.researcher?.name || r.researcher?.fullName || "-"}
                         </div>
+                        <div className="mt-2 d-flex gap-2">
+                          <Button size="sm" variant="success" disabled={!!saving[r._id]} onClick={() => approvePending(r._id)}>Approve</Button>
+                          <Button size="sm" variant="outline-danger" disabled={!!saving[r._id]} onClick={() => rejectPending(r._id)}>Reject</Button>
+                          {r.researchId && (
+                            <Button size="sm" variant="outline-primary" onClick={() => navigate(`/supervisor/research/${r.researchId}`)}>View Research</Button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -494,6 +557,8 @@ const SupervisorFeedback = ({ auth, setAuth }) => {
                           >
                             Clear
                           </Button>
+                          <Button size="sm" variant="outline-success" disabled={!!saving[r._id]} onClick={() => setFeasibility(r._id, true)}>Feasible</Button>
+                          <Button size="sm" variant="outline-warning" disabled={!!saving[r._id]} onClick={() => setFeasibility(r._id, false)}>Not Feasible</Button>
                         </div>
                       </div>
                     ))}

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Row, Col, Card, Button, Nav, Badge } from 'react-bootstrap';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Row, Col, Card, Button, Nav, Badge, Modal } from 'react-bootstrap';
+import { Document, Page, pdfjs } from 'react-pdf';
 import {
   HouseDoor,
   FileEarmarkText,
@@ -10,6 +11,8 @@ import {
 } from 'react-bootstrap-icons';
 import { useNavigate } from 'react-router-dom';
 
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+
 const SupervisorDashboard = ({ auth, setAuth }) => {
   const [requests, setRequests] = useState([]);
   const [feedbackText, setFeedbackText] = useState({});
@@ -17,27 +20,46 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [numPages, setNumPages] = useState(null);
+  const [pageNumber, setPageNumber] = useState(1);
   const toggleSidebar = () => setSidebarOpen((s) => !s);
 
   const navigate = useNavigate();
 
+  const fetchRequests = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/supervisions/requests', {
+        headers: { Authorization: `Bearer ${auth?.token}` },
+      });
+      const data = await res.json();
+      setRequests((data && (data.data || data.requests)) || []);
+    } catch (err) {
+      console.error('Error fetching requests:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [auth?.token]);
+
   useEffect(() => {
-    const fetchRequests = async () => {
-      try {
-        const token = localStorage.getItem('supervisorToken');
-        const res = await fetch('http://localhost:5000/api/supervisions/requests', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        setRequests(data.requests || []);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRequests();
-  }, []);
+    if (auth?.token) fetchRequests();
+  }, [fetchRequests, auth?.token]);
+
+  const handleViewDocument = useCallback(async (supervisionId) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/supervisors/research-document/${supervisionId}`, {
+        headers: { Authorization: `Bearer ${auth?.token}` },
+      });
+      if (!res.ok) throw new Error('Failed to fetch document');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      setSelectedDocument(url);
+      setPageNumber(1);
+    } catch (err) {
+      console.error('Error fetching document:', err);
+      alert('Failed to load document');
+    }
+  }, [auth?.token]);
 
   const handleStatusChange = async (id, status) => {
     try {
@@ -52,6 +74,23 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
     } catch (err) {
       console.error(err);
       alert('Error updating status');
+    }
+  };
+
+  const handleReject = async (id) => {
+    if (!window.confirm('Reject this supervision request?')) return;
+    try {
+      const token = localStorage.getItem('supervisorToken');
+      const res = await fetch(`http://localhost:5000/api/supervisions/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || 'Failed');
+      setRequests((prev) => prev.filter((r) => r._id !== id));
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Error rejecting request');
     }
   };
 
@@ -126,6 +165,7 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
   ];
 
   return (
+    <>
     <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f5f7fb' }}>
       {/* Sidebar */}
       <div
@@ -310,11 +350,19 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
                       <React.Fragment key={req._id}>
                         <tr>
                           <td>{i + 1}</td>
-                          <td>{req.researcher?.name}</td>
+                          <td>{req.researcher?.fullName || req.researcher?.name}</td>
                           <td>{req.projectTitle}</td>
                           <td>{req.durationMonths || 'N/A'}</td>
                           <td>{getStatusBadge(req.status)}</td>
                           <td>
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              className="me-2"
+                              onClick={() => handleViewDocument(req._id)}
+                            >
+                              View Research Document
+                            </Button>
                             {req.status === 'Pending' && (
                               <>
                                 <Button
@@ -324,6 +372,13 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
                                 >
                                   Approve (Make Current)
                                 </Button>{' '}
+                                <Button
+                                  size="sm"
+                                  variant="outline-danger"
+                                  onClick={() => handleReject(req._id)}
+                                >
+                                  Reject
+                                </Button>
                               </>
                             )}
                           </td>
@@ -440,9 +495,35 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
         )}
       </div>
     </div>
+
+    {/* Document Viewer Modal */}
+    <Modal show={!!selectedDocument} onHide={() => setSelectedDocument(null)} size="lg">
+      <Modal.Header closeButton>
+        <Modal.Title>Research Document</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        {selectedDocument && (
+          <>
+            <Document file={selectedDocument} onLoadSuccess={({ numPages }) => setNumPages(numPages)}>
+              <Page pageNumber={pageNumber} />
+            </Document>
+            <div className="d-flex justify-content-between mt-3">
+              <Button disabled={pageNumber <= 1} onClick={() => setPageNumber((p) => p - 1)}>
+                Previous
+              </Button>
+              <span>
+                Page {pageNumber} of {numPages || 0}
+              </span>
+              <Button disabled={!!numPages && pageNumber >= numPages} onClick={() => setPageNumber((p) => p + 1)}>
+                Next
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal.Body>
+    </Modal>
+    </>
   );
 };
 
 export default SupervisorDashboard;
-
-

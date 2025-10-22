@@ -34,6 +34,7 @@ import express from "express";
 import Supervision from "../models/Supervision.js";
 import Supervisor from "../models/Supervisor.js";
 import Research from "../models/Research.js";
+import Notification from "../models/Notification.js";
 
 const router = express.Router();
 
@@ -66,13 +67,57 @@ router.get("/supervisions/pending-verification", async (req, res) => {
   }
 });
 
+// ---------------- Ministry: Explicitly reject a supervision (manual decision) ----------------
+router.post("/supervisions/:id/reject", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason = "Rejected by ministry" } = req.body || {};
+
+    const supervision = await Supervision.findById(id);
+    if (!supervision) return res.status(404).json({ success: false, message: "Supervision not found" });
+
+    supervision.verifiedByMinistry = false;
+    supervision.ministryReviewed = true;
+    supervision.ministryReason = reason;
+    await supervision.save();
+
+    // Notify researcher and admin of rejection
+    try {
+      await Notification.create([
+        {
+          forRole: "researcher",
+          forRoleRef: "Researcher",
+          forUser: supervision.researcher,
+          type: "supervision_rejected_ministry",
+          message: "Your supervision request was rejected by ministry",
+          payload: { supervisionId: String(supervision._id), reason },
+        },
+        {
+          forRole: "admin",
+          forRoleRef: "Admin",
+          type: "supervision_rejected_ministry",
+          message: "A supervision request was rejected by ministry",
+          payload: { supervisionId: String(supervision._id), reason },
+        },
+      ]);
+    } catch (e) {
+      console.error("Ministry rejection notification error:", e);
+    }
+
+    return res.json({ success: true, message: "Supervision rejected", supervision });
+  } catch (err) {
+    console.error("POST /ministry/supervisions/:id/reject error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 // ---------------- Ministry: Verify domain overlap for a supervision ----------------
 router.post("/supervisions/:id/verify-domain", async (req, res) => {
   try {
     const supervision = await Supervision.findById(req.params.id);
     if (!supervision) return res.status(404).json({ success: false, message: "Supervision not found" });
 
-    const supervisor = await Supervisor.findById(supervision.supervisor).select("domains");
+    const supervisor = await Supervisor.findById(supervision.supervisor).select("domains availability");
     if (!supervisor) return res.status(404).json({ success: false, message: "Supervisor not found" });
 
     const research = await Research.findOne({ supervisionRef: supervision._id }).select("domains title");
@@ -87,16 +132,40 @@ router.post("/supervisions/:id/verify-domain", async (req, res) => {
     }
 
     const overlap = (candidateDomains || []).filter(d => (supervisor.domains || []).includes(d));
-    const approved = overlap.length > 0;
+    // Ministry only validates domain match; availability/capacity will be enforced at supervisor decision time
+    let approved = overlap.length > 0;
+    let reason = approved ? "" : "No domain overlap between research and supervisor";
 
     if (approved) {
       supervision.verifiedByMinistry = true;
+      supervision.ministryReviewed = true;
+      supervision.ministryReason = "";
+      await supervision.save();
+      // Notify supervisor to accept/reject
+      try {
+        await Notification.create({
+          forRole: "supervisor",
+          forRoleRef: "Supervisor",
+          forUser: supervision.supervisor,
+          type: "supervision_pending_review",
+          message: "A ministry-approved supervision request is awaiting your decision",
+          payload: { supervisionId: String(supervision._id) },
+        });
+      } catch (e) {
+        // log but don't fail the response
+        console.error("Ministry approval notification error:", e);
+      }
+    } else {
+      // Record explicit rejection decision
+      supervision.ministryReviewed = true;
+      supervision.ministryReason = reason || "No domain overlap";
       await supervision.save();
     }
 
     return res.json({
       success: true,
       approved,
+      reason,
       overlap,
       supervisionId: supervision._id,
       researchTitle: research?.title || supervision.projectTitle,

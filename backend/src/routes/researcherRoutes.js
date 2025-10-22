@@ -161,6 +161,7 @@
 // import Researcher from "../models/Researcher.js";
 // import Supervision from "../models/Supervision.js";
 // import Research from "../models/Research.js";
+import Notification from "../models/Notification.js";
 // import multer from "multer";
 
 // const router = express.Router();
@@ -806,6 +807,73 @@ router.get("/supervisors/by-domains", verifyToken, async (req, res) => {
   }
 });
 
+// ✅ Dynamic Domains (union from Research and Supervisor)
+router.get("/domains", verifyToken, async (req, res) => {
+  try {
+    const researchDomains = await Research.distinct("domains");
+    const supervisorDomains = await Supervisor.distinct("domains");
+    const set = new Set();
+    (researchDomains || []).forEach(d => Array.isArray(d) ? d.forEach(x => set.add(x)) : set.add(d));
+    (supervisorDomains || []).forEach(d => Array.isArray(d) ? d.forEach(x => set.add(x)) : set.add(d));
+    const domains = Array.from(set).filter(Boolean).sort();
+    res.json({ success: true, data: domains });
+  } catch (err) {
+    console.error("Get domains error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ✅ Create/Upload a Research (Researcher)
+router.post(
+  "/research",
+  verifyToken,
+  // allow optional paper file upload under field name 'paperFile'
+  upload.single("paperFile"),
+  async (req, res) => {
+    try {
+      const { title, description } = req.body || {};
+      let { domains } = req.body || {};
+      if (!title || !description) {
+        return res.status(400).json({ success: false, message: "title and description are required" });
+      }
+      // normalize domains to array (limit 1..3)
+      if (domains) {
+        if (!Array.isArray(domains)) domains = String(domains).split(',').map(s => s.trim()).filter(Boolean);
+      } else {
+        domains = [];
+      }
+      if (domains.length === 0 || domains.length > 3) {
+        return res.status(400).json({ success: false, message: "domains must contain between 1 and 3 entries" });
+      }
+
+      const paperUrl = req.file ? (req.file.path || req.file.location || req.file.filename) : (req.body.paperUrl || null);
+      const documentPath = req.file ? (req.file.path || req.file.location || req.file.filename) : (req.body.documentPath || null);
+      if (!documentPath) {
+        return res.status(400).json({ success: false, message: "documentPath (PDF upload) is required" });
+      }
+
+      const research = new Research({
+        title,
+        description,
+        domains,
+        researcher: req.userId,
+        status: "Pending",
+        paperUrl: paperUrl || undefined,
+        documentPath,
+      });
+      await research.save();
+
+      // Link to researcher document
+      await Researcher.findByIdAndUpdate(req.userId, { $addToSet: { researches: research._id } });
+
+      return res.json({ success: true, data: research });
+    } catch (err) {
+      console.error("Create research error:", err);
+      return res.status(500).json({ success: false, message: "Server error" });
+    }
+  }
+);
+
 // ✅ Researcher Login
 router.post("/login", async (req, res) => {
   try {
@@ -893,6 +961,7 @@ router.get("/research/:id/supervisors", verifyToken, async (req, res) => {
 
     const supervisors = await Supervisor.find({
       domains: { $in: research.domains || [] },
+      availability: 'Available',
     })
       .select("name email domains profileImage googleScholar scopus availability")
       .limit(50)
@@ -940,6 +1009,18 @@ router.post("/research/:id/request-supervision", verifyToken, async (req, res) =
     const { supervisorId } = req.body || {};
     if (!supervisorId) return res.status(400).json({ success: false, message: "supervisorId is required" });
 
+    // Load target supervisor and enforce availability, capacity (<=5 Current), and domain match
+    const sup = await Supervisor.findById(supervisorId).lean();
+    if (!sup) return res.status(404).json({ success: false, message: "Supervisor not found" });
+    if (sup.availability && sup.availability !== 'Available') {
+      return res.status(400).json({ success: false, message: "Supervisor is not available" });
+    }
+    // Enforce capacity limit: at most 5 current supervisions
+    const currentCount = await Supervision.countDocuments({ supervisor: supervisorId, status: "Current" });
+    if (currentCount >= 5) {
+      return res.status(400).json({ success: false, message: "Supervisor has reached maximum active supervisions" });
+    }
+
     // Prevent multiple concurrent or pending supervisions for this researcher
     const existing = await Supervision.findOne({
       researcher: req.userId,
@@ -952,6 +1033,14 @@ router.post("/research/:id/request-supervision", verifyToken, async (req, res) =
     const base = await Research.findById(req.params.id);
     if (!base) return res.status(404).json({ success: false, message: "Research not found" });
 
+    // Must share at least one domain
+    const researchDomains = Array.isArray(base.domains) ? base.domains : [];
+    const supervisorDomains = Array.isArray(sup.domains) ? sup.domains : [];
+    const intersects = researchDomains.some(d => supervisorDomains.includes(d));
+    if (!intersects) {
+      return res.status(400).json({ success: false, message: "Supervisor domains do not match research domains" });
+    }
+
     let target = base;
     if (String(base.researcher) !== String(req.userId)) {
       // Create a new research entry under the requesting user
@@ -962,6 +1051,7 @@ router.post("/research/:id/request-supervision", verifyToken, async (req, res) =
         researcher: req.userId,
         status: "Pending",
         feasibility: base.feasibility || null,
+        documentPath: base.documentPath,
       });
       await target.save();
       await Researcher.findByIdAndUpdate(req.userId, { $addToSet: { researches: target._id } });
@@ -970,6 +1060,9 @@ router.post("/research/:id/request-supervision", verifyToken, async (req, res) =
       if (target.status !== "Pending") {
         target.status = "Pending";
         await target.save();
+      }
+      if (!target.documentPath) {
+        return res.status(400).json({ success: false, message: "Research documentPath is missing for this research" });
       }
     }
 
@@ -985,6 +1078,24 @@ router.post("/research/:id/request-supervision", verifyToken, async (req, res) =
     // Link supervision back to research
     target.supervisionRef = supervision._id;
     await target.save();
+
+    // Notify admins that a new supervision needs verification
+    try {
+      await Notification.create({
+        forRole: "admin",
+        forRoleRef: "Admin",
+        type: "supervision_request_created",
+        message: `New supervision request: ${target.title}`,
+        payload: {
+          supervisionId: String(supervision._id),
+          researcherId: String(req.userId),
+          supervisorId: String(supervisorId),
+          projectTitle: target.title,
+        },
+      });
+    } catch (e) {
+      console.error("Create admin notification error:", e.message);
+    }
 
     return res.json({ success: true, data: { researchId: target._id, supervisionId: supervision._id } });
   } catch (err) {
@@ -1090,9 +1201,8 @@ router.get("/coactor/:id/supervision-current", verifyToken, async (req, res) => 
 // ✅ Get Researcher Profile
 router.get("/profile", verifyToken, async (req, res) => {
   try {
-    const researcher = await Researcher.findById(req.userId)
+    let researcher = await Researcher.findById(req.userId)
       .select("-password")
-      // Populate only existing path from Researcher schema
       .populate("researches");
 
     if (!researcher)
@@ -1100,6 +1210,23 @@ router.get("/profile", verifyToken, async (req, res) => {
         success: false,
         message: "Researcher not found" 
       });
+
+    // Ensure researches are available even if 'researches' array is out of sync
+    let ownedResearches = [];
+    try {
+      ownedResearches = await Research.find({ researcher: researcher._id }).lean();
+      const idsInDoc = new Set((researcher.researches || []).map(r => String(r._id || r)));
+      const missing = ownedResearches.filter(r => !idsInDoc.has(String(r._id))).map(r => r._id);
+      if (missing.length) {
+        await Researcher.findByIdAndUpdate(researcher._id, { $addToSet: { researches: { $each: missing } } });
+        // re-read researcher with updated researches for response
+        researcher = await Researcher.findById(req.userId)
+          .select("-password")
+          .populate("researches");
+      }
+    } catch (e) {
+      // best-effort sync; still return
+    }
 
     const currentSupervision = await Supervision.findOne({
       researcher: researcher._id,
@@ -1112,6 +1239,8 @@ router.get("/profile", verifyToken, async (req, res) => {
       success: true,
       data: {
         researcher,
+        // also expose owned researches explicitly for UIs that don't use 'researcher.researches'
+        researches: ownedResearches,
         currentSupervision: currentSupervision || null,
       }
     });

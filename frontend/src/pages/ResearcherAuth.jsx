@@ -28,7 +28,15 @@ const ResearcherAuth = ({ setAuth }) => {
   const [degree, setDegree] = useState("");
   const [domains, setDomains] = useState([]);
   const [cvFile, setCvFile] = useState(null);
-  const [transcripts, setTranscripts] = useState([]);
+  // Academic qualifications
+  const studyOptions = [
+    "Bachelor's Degree",
+    "Master's Degree",
+    "Postgraduate Diploma",
+    "Doctoral Degree",
+  ];
+  const [studies, setStudies] = useState([]);
+  const [transcriptFiles, setTranscriptFiles] = useState({});
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [grants, setGrants] = useState("");
   const [collaborations, setCollaborations] = useState("");
@@ -140,6 +148,18 @@ const ResearcherAuth = ({ setAuth }) => {
         if (domains.length === 0 || domains.length > 3) {
           throw new Error("Select 1 to 3 domains");
         }
+        if (studies.length === 0) {
+          throw new Error("Select at least one academic qualification");
+        }
+        // Validate transcripts: one per selected study
+        const allowedTypes = ['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+        const maxSize = 10 * 1024 * 1024;
+        for (const study of studies) {
+          const file = transcriptFiles[study];
+          if (!file) throw new Error(`Please upload transcript for ${study}`);
+          if (!allowedTypes.includes(file.type)) throw new Error(`${study} transcript must be PDF/DOC/DOCX`);
+          if (file.size > maxSize) throw new Error(`${study} transcript must be under 10MB`);
+        }
 
         const fd = new FormData();
         fd.append("fullName", fullName.trim());
@@ -149,7 +169,8 @@ const ResearcherAuth = ({ setAuth }) => {
         if (degree) fd.append("degree", degree.trim());
         fd.append("domains", JSON.stringify(domains));
         if (cvFile) fd.append("cvFile", cvFile);
-        transcripts.forEach((file) => fd.append("transcripts", file));
+        fd.append("studies", JSON.stringify(studies));
+        studies.forEach((study) => { if (transcriptFiles[study]) fd.append("transcripts", transcriptFiles[study]); });
         if (profilePhoto) fd.append("profilePhoto", profilePhoto);
         if (grants) fd.append("grants", grants.trim());
         if (collaborations) fd.append("collaborations", collaborations.trim());
@@ -278,6 +299,36 @@ const ResearcherAuth = ({ setAuth }) => {
                       <small className="text-muted">Selected: {domains.length}/3</small>
                     </div>
 
+                    {/* Academic Qualifications */}
+                    <div className="mb-3">
+                      <h6 className="fw-bold mb-2" style={{ color: "#0d3b66" }}>
+                        <BookOpen className="me-2" size={16} /> Academic Qualifications (select and upload transcripts)
+                      </h6>
+                      <div className="d-flex flex-wrap gap-2 mb-2">
+                        {studyOptions.map((s) => (
+                          <Button
+                            key={s}
+                            type="button"
+                            size="sm"
+                            variant={studies.includes(s) ? "primary" : "outline-secondary"}
+                            onClick={() => setStudies((prev)=> prev.includes(s)? prev.filter(x=>x!==s): [...prev, s])}
+                            disabled={loading}
+                          >
+                            {s}
+                          </Button>
+                        ))}
+                      </div>
+                      {studies.map((s)=>(
+                        <Form.Group key={s} className="mb-2">
+                          <Form.Label className="fw-semibold">{s} Transcript (PDF/DOC/DOCX)</Form.Label>
+                          <Form.Control type="file" accept=".pdf,.doc,.docx" disabled={loading} onChange={(e)=>setTranscriptFiles((m)=>({...m,[s]: e.target.files?.[0]}))} />
+                          {transcriptFiles[s] && (
+                            <small className="text-success d-block">✓ {transcriptFiles[s].name}</small>
+                          )}
+                        </Form.Group>
+                      ))}
+                    </div>
+
                     <div className="mb-3">
                       <h6 className="fw-bold mb-2" style={{ color: "#0d3b66" }}>
                         <FileText className="me-2" size={16} /> Documents (optional)
@@ -289,10 +340,6 @@ const ResearcherAuth = ({ setAuth }) => {
                       <Form.Group className="mb-3">
                         <Form.Label className="fw-semibold">CV (PDF/DOC/DOCX)</Form.Label>
                         <Form.Control type="file" accept=".pdf,.doc,.docx" disabled={loading} onChange={(e)=>setCvFile(e.target.files[0])} />
-                      </Form.Group>
-                      <Form.Group className="mb-3">
-                        <Form.Label className="fw-semibold">Transcripts (multiple)</Form.Label>
-                        <Form.Control type="file" multiple accept=".pdf,.doc,.docx" disabled={loading} onChange={(e)=>setTranscripts(Array.from(e.target.files||[]))} />
                       </Form.Group>
                     </div>
 
@@ -382,11 +429,10 @@ const ResearcherAuth = ({ setAuth }) => {
       </Container>
 
       {/* Polished Interactions */}
-      <style jsx>{`
+      <style>{`
         .login-btn:hover {
           transform: translateY(-2px);
           box-shadow: 0 6px 14px rgba(13, 59, 102, 0.25);
-          transition: all 0.3s ease-in-out;
         }
         .form-control:focus {
           border-color: #00798c !important;

@@ -58,10 +58,8 @@ const SupervisorAuth = ({ setAuth }) => {
   useEffect(() => {
     setIsLogin(modeFromQuery !== "register");
     // Clear form when switching modes
-    if (modeFromQuery !== "register" && !isLogin) {
-      resetForm();
-    }
-  }, [modeFromQuery, isLogin]);
+    resetForm();
+  }, [modeFromQuery]);
 
   const resetForm = () => {
     setName("");
@@ -199,13 +197,7 @@ const SupervisorAuth = ({ setAuth }) => {
         return false;
       }
       
-      // Check if all selected studies have transcript files
-      for (const study of studies) {
-        if (!transcriptFiles[study]) {
-          setError(`Please upload transcript for ${study}`);
-          return false;
-        }
-      }
+      // Transcripts are optional in development; if provided, they'll be validated below
       
       if (!cvFile) {
         setError("Please upload your CV document");
@@ -221,6 +213,7 @@ const SupervisorAuth = ({ setAuth }) => {
       }
 
       for (const [study, file] of Object.entries(transcriptFiles)) {
+        if (!file) continue;
         if (!allowedTypes.includes(file.type)) {
           setError(`${study} transcript must be a PDF, DOC, or DOCX file`);
           return false;
@@ -235,6 +228,7 @@ const SupervisorAuth = ({ setAuth }) => {
       }
 
       for (const [study, file] of Object.entries(transcriptFiles)) {
+        if (!file) continue;
         if (file.size > maxSize) {
           setError(`${study} transcript file size must be less than 10MB`);
           return false;
@@ -791,7 +785,12 @@ const SupervisorAuth = ({ setAuth }) => {
                       </Button>
                     </div>
                     <div className="text-center mt-3">
-                      <Button variant="link" type="button" onClick={() => { setIsLogin(!isLogin); resetForm(); }} disabled={loading}>
+                      <Button
+                        variant="link"
+                        type="button"
+                        onClick={() => { const next = isLogin ? 'register' : 'login'; navigate(`/supervisor/auth?mode=${next}`); }}
+                        disabled={loading}
+                      >
                         {isLogin ? "New supervisor? Create account" : "Already registered? Sign in"}
                       </Button>
                     </div>
@@ -841,7 +840,7 @@ const SupervisorAuth = ({ setAuth }) => {
           </Col>
         </Row>
       </Container>
-      <style jsx>{`
+      <style>{`
         .btn:hover:not(:disabled) {
           transform: translateY(-2px);
           box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);

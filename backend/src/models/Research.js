@@ -17,6 +17,12 @@ const researchSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    // Absolute or relative path to the uploaded research document (PDF)
+    documentPath: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     domains: {
       type: [String],
       required: true,

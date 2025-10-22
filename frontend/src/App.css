@@ -1,3 +1,33 @@
+/* React PDF viewer styles */
+.react-pdf__Document {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.react-pdf__Page {
+  max-width: 100%;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+  margin: 1rem;
+}
+
+.react-pdf__Page canvas {
+  max-width: 100%;
+  height: auto !important;
+}
+
+/* Supervisor Dashboard basic layout */
+.dashboard-container {
+  padding: 20px;
+}
+
+.request-card {
+  border: 1px solid #ddd;
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 4px;
+  background: #fff;
+}
 .App {
   text-align: center;
 }

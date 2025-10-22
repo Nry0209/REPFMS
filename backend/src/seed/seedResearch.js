@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 import Researcher from '../models/Researcher.js';
 import Research from '../models/Research.js';
 
@@ -13,11 +14,20 @@ async function main() {
   await mongoose.connect(uri, { dbName: process.env.DB_NAME || undefined });
 
   try {
-    // Pick up to 4 researchers to attach sample researches
-    const researchers = await Researcher.find({}).limit(4).lean();
+    // Ensure at least 1 researcher exists (auto-create a sample if none)
+    let researchers = await Researcher.find({}).limit(4).lean();
     if (researchers.length === 0) {
-      console.log('No researchers found. Seed researchers first.');
-      return;
+      console.log('No researchers found. Creating a sample researcher...');
+      const hashed = await bcrypt.hash('Password123!', 10);
+      const sample = await Researcher.create({
+        fullName: 'Sample Researcher',
+        email: 'sample.researcher@example.com',
+        password: hashed,
+        department: 'Science & Technology',
+        degree: 'BSc',
+        domains: ['Information Technology', 'Health'],
+      });
+      researchers = [sample.toObject()];
     }
 
     const samples = [];
@@ -54,7 +64,7 @@ async function main() {
     }
 
     // Insert samples and attach to researchers
-    const inserted = await Research.insertMany(samples);
+    const inserted = samples.length ? await Research.insertMany(samples) : [];
     const byResearcher = new Map();
     for (const doc of inserted) {
       const arr = byResearcher.get(String(doc.researcher)) || [];

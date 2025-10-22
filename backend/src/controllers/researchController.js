@@ -29,7 +29,7 @@ export const listCollections = async (req, res) => {
 // @access  Public
 export const getResearches = async (req, res) => {
   try {
-    const researches = await Research.find()
+    const items = await Research.find()
       .populate({
         path: 'researcher',
         select: 'fullName email',
@@ -37,12 +37,28 @@ export const getResearches = async (req, res) => {
       })
       .populate({
         path: 'supervisor',
-        select: 'name email',
+        select: 'name email title',
         model: 'Supervisor'
       })
+      .populate({
+        path: 'supervisionRef',
+        populate: { path: 'supervisor', select: 'name email title' }
+      })
       .sort({ createdAt: -1 });
-    
-    res.json(researches);
+
+    const mapped = items.map((r) => {
+      const plain = r.toObject();
+      // Derive supervisor and status from supervisionRef for admin display
+      if (plain.supervisionRef?.supervisor) {
+        plain.supervisor = plain.supervisionRef.supervisor;
+        const v = plain.supervisionRef.verifiedByMinistry;
+        const reviewed = plain.supervisionRef.ministryReviewed;
+        plain.supervisorStatus = v ? 'accepted' : (reviewed ? 'rejected' : (plain.supervisorStatus || 'pending'));
+      }
+      return plain;
+    });
+
+    res.json(mapped);
   } catch (error) {
     console.error('Error fetching researches:', error);
     res.status(500).json({ message: 'Server error' });
@@ -69,13 +85,25 @@ export const getResearchById = async (req, res) => {
         path: 'supervisor',
         select: 'name email title',
         model: 'Supervisor'
+      })
+      .populate({
+        path: 'supervisionRef',
+        populate: { path: 'supervisor', select: 'name email title' }
       });
     
     if (!research) {
       return res.status(404).json({ message: 'Research not found' });
     }
-    
-    res.json(research);
+
+    const plain = research.toObject();
+    if (plain.supervisionRef?.supervisor) {
+      plain.supervisor = plain.supervisionRef.supervisor;
+      const v = plain.supervisionRef.verifiedByMinistry;
+      const reviewed = plain.supervisionRef.ministryReviewed;
+      plain.supervisorStatus = v ? 'accepted' : (reviewed ? 'rejected' : (plain.supervisorStatus || 'pending'));
+    }
+
+    res.json(plain);
   } catch (error) {
     console.error('Error fetching research:', error);
     res.status(500).json({ message: 'Server error' });

@@ -9,7 +9,12 @@ import {
   updateSupervisor,
   deleteSupervisor,
   approveSupervisor, 
-  rejectSupervisor 
+  rejectSupervisor,
+  listPendingSupervisions,
+  approveSupervision,
+  rejectSupervision,
+  getAdminNotifications,
+  markAdminNotificationRead,
 } from '../controllers/adminController.js';
 
 const router = express.Router();
@@ -64,5 +69,14 @@ router.put('/supervisors/:id', updateSupervisor);
 router.delete('/supervisors/:id', deleteSupervisor);
 router.patch('/supervisors/:id/approve', approveSupervisor);
 router.patch('/supervisors/:id/reject', rejectSupervisor);
+
+// Supervision management (admin)
+router.get('/supervisions/pending', listPendingSupervisions);
+router.patch('/supervisions/:id/approve', approveSupervision);
+router.delete('/supervisions/:id/reject', rejectSupervision);
+
+// Notifications (admin)
+router.get('/notifications', getAdminNotifications);
+router.patch('/notifications/:id/read', markAdminNotificationRead);
 
 export default router;

@@ -8,6 +8,8 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import Supervisor from "../models/Supervisor.js";
+import Supervision from "../models/Supervision.js";
+import Research from "../models/Research.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import { getSupervisorProfile, updateSupervisorProfile, getAllSupervisors } from "../controllers/supervisorController.js";
 
@@ -116,12 +118,14 @@ const cleanupFiles = (files) => {
   });
 };
 
-const generateToken = (supervisor) =>
-  jwt.sign(
+const generateToken = (supervisor) => {
+  const secret = process.env.JWT_SECRET || 'dev_secret_change_me';
+  return jwt.sign(
     { id: supervisor._id, supervisorId: supervisor._id, email: supervisor.email, role: "supervisor" },
-    process.env.JWT_SECRET,
+    secret,
     { expiresIn: "24h" }
   );
+};
 
 // ---------- Public Routes ----------
 router.get('/list', getAllSupervisors);
@@ -133,7 +137,7 @@ router.post("/register", uploadFields, async (req, res) => {
 
     if (!name || !email || !password || !title || !affiliation || !experience) {
       cleanupFiles(req.files);
-      return res.status(400).json({ message: "Missing required fields." });
+      return res.status(400).json({ message: "Missing required fields: name, email, password, title, affiliation, experience." });
     }
 
     const expNum = parseInt(experience);
@@ -142,22 +146,41 @@ router.post("/register", uploadFields, async (req, res) => {
       return res.status(400).json({ message: "Experience must be between 0 and 70 years." });
     }
 
-    const parsedDomains = typeof domains === "string" ? JSON.parse(domains) : domains;
-    const parsedStudies = typeof studies === "string" ? JSON.parse(studies) : studies;
+    let parsedDomains = typeof domains === "string" ? JSON.parse(domains) : domains;
+    let parsedStudies = typeof studies === "string" ? JSON.parse(studies) : studies;
 
-    if (!parsedDomains?.length) { cleanupFiles(req.files); return res.status(400).json({ message: "At least one domain required." }); }
-    if (!parsedStudies?.length) { cleanupFiles(req.files); return res.status(400).json({ message: "At least one study required." }); }
-    if (!req.files?.cvFile?.length) { cleanupFiles(req.files); return res.status(400).json({ message: "CV is required." }); }
-    if ((req.files.transcripts?.length || 0) !== parsedStudies.length) { cleanupFiles(req.files); return res.status(400).json({ message: "All transcripts required." }); }
+    if (!Array.isArray(parsedDomains) || parsedDomains.length === 0) {
+      cleanupFiles(req.files);
+      return res.status(400).json({ message: "At least one domain required." });
+    }
+    // Enforce maximum of 3 domains
+    parsedDomains = parsedDomains.map((d) => (typeof d === 'string' ? d.trim() : d)).filter(Boolean).slice(0, 3);
 
-    if (await Supervisor.findOne({ email: email.toLowerCase() })) {
+    if (!Array.isArray(parsedStudies) || parsedStudies.length === 0) {
+      cleanupFiles(req.files);
+      return res.status(400).json({ message: "At least one study required." });
+    }
+
+    if (!req.files?.cvFile?.length) {
+      cleanupFiles(req.files);
+      return res.status(400).json({ message: "CV is required." });
+    }
+
+    // Transcripts are optional in dev: map provided ones by order, skip missing
+    const transcriptsMap = {};
+    const providedTranscripts = req.files.transcripts || [];
+    providedTranscripts.forEach((file, i) => {
+      const key = parsedStudies[i] || `study_${i+1}`;
+      transcriptsMap[key] = file.path;
+    });
+
+    const existing = await Supervisor.findOne({ email: email.toLowerCase() });
+    if (existing) {
       cleanupFiles(req.files);
       return res.status(400).json({ message: "Email already registered." });
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
-    const transcriptsMap = {};
-    req.files.transcripts?.forEach((file, i) => { transcriptsMap[parsedStudies[i]] = file.path; });
 
     const supervisor = new Supervisor({
       name: name.trim(),
@@ -261,3 +284,40 @@ router.get("/profile-image/:id", async (req, res) => {
 });
 
 export default router;
+
+// ------------------- Research Document Download (Supervisor) -------------------
+// Note: mounted under /api/supervisors
+router.get("/research-document/:id", protect, async (req, res) => {
+  try {
+    const supervision = await Supervision.findById(req.params.id)
+      .populate('researcher', 'fullName')
+      .populate('supervisor');
+
+    if (!supervision) {
+      return res.status(404).json({ message: "Supervision not found" });
+    }
+
+    // Verify the requesting supervisor is assigned to this supervision
+    if (String(supervision.supervisor?._id) !== String(req.user?._id)) {
+      return res.status(403).json({ message: "Not authorized to access this document" });
+    }
+
+    // Get associated research document by supervisionRef
+    const research = await Research.findOne({ supervisionRef: supervision._id });
+    if (!research || !research.documentPath) {
+      return res.status(404).json({ message: "Research document not found" });
+    }
+
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const filePath = path.join(__dirname, "../../", research.documentPath.replace(/^\/+/, ""));
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: "File not found" });
+    }
+
+    return res.download(filePath);
+  } catch (err) {
+    console.error("Get research document error:", err);
+    return res.status(500).json({ message: "Error retrieving document" });
+  }
+});

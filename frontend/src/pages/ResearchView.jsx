@@ -160,11 +160,10 @@ export default function ResearchView() {
                     </div>
                     <div className="mt-auto">
                       <button
-                        disabled={!s.available}
                         onClick={() => requestSupervision(s._id)}
-                        className={`btn btn-sm mt-3 ${s.available ? "btn-primary" : "btn-secondary"}`}
+                        className={`btn btn-sm mt-3 btn-primary`}
                       >
-                        {s.available ? "Request Supervision" : "Not Available"}
+                        Request Supervision
                       </button>
                     </div>
                   </div>

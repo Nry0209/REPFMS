@@ -1,34 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Table, Spinner, Badge, Button, Form, Modal, Container } from 'react-bootstrap';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, Table, Spinner, Badge, Button, Modal } from 'react-bootstrap';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { useNavigate } from 'react-router-dom';
 import { 
   getResearches, 
-  getAvailableSupervisors, 
-  assignSupervisor,
-  updateSupervisorStatus,
-  deleteResearch,
-  generateReport 
+  deleteResearch
 } from '../../api/researchService';
 import { toast } from 'react-toastify';
 
 const ResearchManagement = () => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const [researches, setResearches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedResearch, setSelectedResearch] = useState(null);
-  const [supervisors, setSupervisors] = useState([]);
-  const [selectedSupervisor, setSelectedSupervisor] = useState('');
-  const [assigning, setAssigning] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState({});
   const [viewingResearch, setViewingResearch] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [downloadingReport, setDownloadingReport] = useState(false);
+  // const [downloadingReport, setDownloadingReport] = useState(false);
+  const [verifying, setVerifying] = useState({}); // { [supervisionId]: true }
+  const [rejecting, setRejecting] = useState({}); // { [supervisionId]: true }
   
   // Filter researches based on search term
   const filteredResearches = researches.filter(research => {
@@ -156,7 +148,63 @@ const ResearchManagement = () => {
     };
   };
 
-  const fetchResearches = async () => {
+  // Ministry actions from Admin dashboard: approve (verify domains) / reject
+  const handleApprove = async (research) => {
+    const supRef = research?.supervisionRef?._id;
+    if (!supRef) {
+      toast.warn('No supervision request linked to this research');
+      return;
+    }
+    try {
+      setVerifying((m) => ({ ...m, [supRef]: true }));
+      const res = await fetch(`http://localhost:5000/api/ministry/supervisions/${supRef}/verify-domain`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) throw new Error(data?.message || 'Approval failed');
+      toast.success('Approved. Supervisor notified.');
+      // Refresh list to reflect Accepted status and supervisor shown
+      const updated = await getResearches();
+      setResearches(updated);
+    } catch (err) {
+      console.error('Approve error:', err);
+      toast.error(err.message || 'Failed to approve');
+    } finally {
+      setVerifying((m) => ({ ...m, [supRef]: false }));
+    }
+  };
+
+  const handleReject = async (research) => {
+    const supRef = research?.supervisionRef?._id;
+    if (!supRef) {
+      toast.warn('No supervision request linked to this research');
+      return;
+    }
+    const reason = window.prompt('Enter rejection reason (optional):', 'Domain mismatch');
+    try {
+      setRejecting((m) => ({ ...m, [supRef]: true }));
+      const res = await fetch(`http://localhost:5000/api/ministry/supervisions/${supRef}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason || 'Rejected by ministry' }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) throw new Error(data?.message || 'Rejection failed');
+      toast.success('Rejected. Researcher notified.');
+      // Refresh list to reflect Rejected badge
+      const updated = await getResearches();
+      setResearches(updated);
+    } catch (err) {
+      console.error('Reject error:', err);
+      toast.error(err.message || 'Failed to reject');
+    } finally {
+      setRejecting((m) => ({ ...m, [supRef]: false }));
+    }
+  };
+
+
+  const fetchResearches = useCallback(async () => {
     try {
       setLoading(true);
       const data = await getResearches();
@@ -169,11 +217,11 @@ const ResearchManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchResearches();
-  }, []);
+  }, [fetchResearches]);
 
   const handleView = async (research) => {
     try {
@@ -187,74 +235,16 @@ const ResearchManagement = () => {
     }
   };
 
-  const handleEdit = (id) => {
-    navigate(`/admin/research/${id}/edit`);
-  };
+  // const handleEdit = (id) => {
+  //   navigate(`/admin/research/${id}/edit`);
+  // };
 
   const handleDeleteClick = (id) => {
     setSelectedResearch(id);
     setShowDeleteConfirm(true);
   };
 
-  const handleAssignClick = async (research) => {
-    setSelectedResearch(research);
-    try {
-      const data = await getAvailableSupervisors();
-      setSupervisors(data);
-      setSelectedSupervisor(research.supervisor?._id || '');
-      setShowAssignModal(true);
-    } catch (error) {
-      console.error('Error loading supervisors:', error);
-      toast.error('Failed to load supervisors');
-    }
-  };
-
-  const handleAssignSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedResearch) return;
-
-    setAssigning(true);
-    try {
-      const { research } = await assignSupervisor(
-        selectedResearch._id,
-        selectedSupervisor || null
-      );
-      
-      // Update the research in the list
-      setResearches(researches.map(r => 
-        r._id === research._id ? { ...r, supervisor: research.supervisor } : r
-      ));
-      
-      toast.success('Supervisor assigned successfully');
-      setShowAssignModal(false);
-    } catch (error) {
-      console.error('Error assigning supervisor:', error);
-      toast.error(error.message || 'Failed to assign supervisor');
-    } finally {
-      setAssigning(false);
-    }
-  };
-
-  const handleStatusUpdate = async (researchId, status) => {
-    if (!window.confirm(`Are you sure you want to ${status} this supervisor?`)) return;
-    
-    setUpdatingStatus(prev => ({ ...prev, [researchId]: true }));
-    try {
-      const { research } = await updateSupervisorStatus(researchId, status);
-      
-      // Update local state with the updated research
-      setResearches(researches.map(r => 
-        r._id === research._id ? research : r
-      ));
-      
-      toast.success(`Supervisor ${status} successfully`);
-    } catch (error) {
-      console.error('Error updating supervisor status:', error);
-      toast.error(error.message || 'Failed to update supervisor status');
-    } finally {
-      setUpdatingStatus(prev => ({ ...prev, [researchId]: false }));
-    }
-  };
+  // Removed admin assignment and status update functions to align with researcher-chosen supervisor flow
 
   const confirmDelete = async () => {
     try {
@@ -273,35 +263,9 @@ const ResearchManagement = () => {
     }
   };
 
-  useEffect(() => {
-    const fetchResearches = async () => {
-      try {
-        const data = await getResearches();
-        setResearches(data);
-      } catch (err) {
-        console.error('Error fetching researches:', err);
-        setError('Failed to load researches. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Removed duplicate useEffect; using the single fetchResearches effect above
 
-    fetchResearches();
-  }, []);
-
-  const getStatusBadge = (status) => {
-    const variants = {
-      'Pending': 'warning',
-      'Current': 'primary',
-      'Finished': 'success'
-    };
-    return <Badge bg={variants[status] || 'secondary'}>{status}</Badge>;
-  };
-
-  const getSupervisorName = (supervisor) => {
-    if (!supervisor) return 'Not Assigned';
-    return `${supervisor.name}${supervisor.title ? ` (${supervisor.title})` : ''}`;
-  };
+  // Helpers inlined in JSX; removed unused badge/name helpers
 
   if (loading) {
     return (
@@ -323,48 +287,7 @@ const ResearchManagement = () => {
 
   return (
     <div className="container-fluid py-4">
-      {/* Assign Supervisor Modal */}
-      <Modal show={showAssignModal} onHide={() => setShowAssignModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Assign Supervisor</Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleAssignSubmit}>
-          <Modal.Body>
-            <Form.Group className="mb-3">
-              <Form.Label>Select Supervisor</Form.Label>
-              <Form.Select 
-                value={selectedSupervisor}
-                onChange={(e) => setSelectedSupervisor(e.target.value)}
-                required
-              >
-                <option value="">-- Select Supervisor --</option>
-                {supervisors.map(supervisor => (
-                  <option key={supervisor._id} value={supervisor._id}>
-                    {supervisor.name} {supervisor.title ? `(${supervisor.title})` : ''}
-                    {supervisor.domains?.length > 0 && ` - ${supervisor.domains.join(', ')}`}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-            <div className="d-flex justify-content-between">
-              <Button 
-                variant="outline-secondary" 
-                onClick={() => setShowAssignModal(false)}
-                disabled={assigning}
-              >
-                Cancel
-              </Button>
-              <Button 
-                variant="primary" 
-                type="submit"
-                disabled={assigning}
-              >
-                {assigning ? 'Assigning...' : 'Assign Supervisor'}
-              </Button>
-            </div>
-          </Modal.Body>
-        </Form>
-      </Modal>
+      {/* Admin no longer assigns supervisors; ministry only verifies domain and supervisors decide */}
 
       {/* Delete Confirmation Modal */}
       <Modal show={showDeleteConfirm} onHide={() => setShowDeleteConfirm(false)}>
@@ -577,49 +500,38 @@ const ResearchManagement = () => {
                             <i className="bi bi-eye"></i>
                           </button>
                           
-                          {!['accepted', 'rejected'].includes(research.supervisorStatus) ? (
-                            <>
-                              <button 
-                                className="btn btn-sm btn-outline-success"
-                                onClick={() => handleAssignClick(research)}
-                                title="Assign Supervisor"
-                              >
-                                <i className="bi bi-person-plus"></i>
-                              </button>
-                              <button 
-                                className="btn btn-sm btn-success"
-                                onClick={() => handleStatusUpdate(research._id, 'accepted')}
-                                disabled={updatingStatus[research._id]}
-                                title="Accept Research"
-                              >
-                                {updatingStatus[research._id] ? (
-                                  <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                                ) : (
-                                  <i className="bi bi-check-lg"></i>
-                                )}
-                              </button>
-                              <button 
-                                className="btn btn-sm btn-danger"
-                                onClick={() => handleStatusUpdate(research._id, 'rejected')}
-                                disabled={updatingStatus[research._id]}
-                                title="Reject Research"
-                              >
-                                {updatingStatus[research._id] ? (
-                                  <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                                ) : (
-                                  <i className="bi bi-x-lg"></i>
-                                )}
-                              </button>
-                            </>
-                          ) : (
-                            <button 
-                              className="btn btn-sm btn-outline-danger"
-                              onClick={() => handleDeleteClick(research._id)}
-                              title="Delete Research"
-                            >
-                              <i className="bi bi-trash"></i>
-                            </button>
-                          )}
+                          {/* Ministry approve/reject supervision for researcher-selected supervisor */}
+                          <button
+                            className="btn btn-sm btn-success"
+                            title="Approve (verify domain)"
+                            disabled={!research?.supervisionRef?._id || verifying[research?.supervisionRef?._id]}
+                            onClick={() => handleApprove(research)}
+                          >
+                            {verifying[research?.supervisionRef?._id] ? (
+                              <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            ) : (
+                              <i className="bi bi-check-lg"></i>
+                            )}
+                          </button>
+                          <button
+                            className="btn btn-sm btn-danger"
+                            title="Reject"
+                            disabled={!research?.supervisionRef?._id || rejecting[research?.supervisionRef?._id]}
+                            onClick={() => handleReject(research)}
+                          >
+                            {rejecting[research?.supervisionRef?._id] ? (
+                              <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            ) : (
+                              <i className="bi bi-x-lg"></i>
+                            )}
+                          </button>
+                          <button 
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => handleDeleteClick(research._id)}
+                            title="Delete Research"
+                          >
+                            <i className="bi bi-trash"></i>
+                          </button>
                         </div>
                       </td>
                     </tr>

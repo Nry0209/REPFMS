@@ -94,6 +94,8 @@ app.get("/api/health", (req, res) => {
 app.use("/api/supervisors", supervisorRoutes);
 app.use("/api/researchers", researcherRoutes);
 app.use("/api/supervisions", supervisionRoutes);
+// Alias to support clients using singular base path
+app.use("/api/supervision", supervisionRoutes);
 app.use("/api/ministry", ministryRoutes);
 app.use("/api/funding", fundingRoutes);
 app.use("/api/researches", researchRoutes);

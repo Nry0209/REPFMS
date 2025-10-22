@@ -70,7 +70,7 @@ const DashboardHeader = ({ auth = {}, setAuth }) => {
               </div>
             </div>
 
-            <style jsx>{`
+            <style>{`
               .search-container {
                 opacity: 0;
                 visibility: hidden;
