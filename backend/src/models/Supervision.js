@@ -17,6 +17,12 @@ const SupervisionSchema = new mongoose.Schema(
     feasibility: { type: String, enum: ["Feasible", "Not Feasible", null], default: null },
     feasibilityReason: { type: String, default: "" },
     verifiedByMinistry: { type: Boolean, default: false },
+    viabilityStatus: {
+      isViable: { type: Boolean, default: null },
+      comments: { type: String, default: "" },
+      assessedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Supervisor", default: null },
+      assessedAt: { type: Date, default: null },
+    },
 
   },
   { timestamps: true }

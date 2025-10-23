@@ -171,6 +171,7 @@
 
 
 import React, { useState, useEffect } from "react";
+import "./styles/pdf-viewer.css";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
 // Common / Landing Page

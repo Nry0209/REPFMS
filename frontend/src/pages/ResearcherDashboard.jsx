@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Container, Row, Col, Card, Badge, Spinner, Alert, Button, Modal, ListGroup, Form, Toast, ToastContainer, Nav } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import {FileText,Users,CheckCircle,Clock,TrendingUp,User,BookOpen} from "lucide-react";
-import { HouseDoor, FileEarmarkText, PersonCircle, FileEarmark, LayoutSidebar, BoxArrowRight } from 'react-bootstrap-icons';
+import { HouseDoor, FileEarmarkText, PersonCircle, FileEarmark, LayoutSidebar, BoxArrowRight, Bell, Envelope, ThreeDotsVertical, Search } from 'react-bootstrap-icons';
 import { getComments, getAssignedPapers, getResearcherUploads, uploadResearcherPaper, getLocalPendingRequests } from "../api/researcher";
 
 const ResearcherDashboard = () => {
@@ -13,6 +13,11 @@ const ResearcherDashboard = () => {
   const [coactorModal, setCoactorModal] = useState({ show: false, coactor: null });
   const [activeComments, setActiveComments] = useState([]);
   const [assignedPapers, setAssignedPapers] = useState([]);
+  // Display name helper (fullName | name | email | id)
+  const getDisplayName = (userOrObj) => {
+    if (!userOrObj) return '-';
+    return userOrObj.fullName || userOrObj.name || userOrObj.email || userOrObj._id || '-';
+  };
   const [myUploads, setMyUploads] = useState([]);
   const [uploadState, setUploadState] = useState({ details: "", file: null, uploading: false, error: "", success: "" });
   const [fundingStatuses, setFundingStatuses] = useState({});
@@ -60,6 +65,45 @@ const ResearcherDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const toggleSidebar = () => setSidebarOpen((s) => !s);
+  // Read-only document viewer state (for Discover Projects or anywhere)
+  const [docModalOpen, setDocModalOpen] = useState(false);
+  const [docUrl, setDocUrl] = useState(null);
+  const [docName, setDocName] = useState(null);
+  // Feedback modal for completed projects
+  const [fbModalOpen, setFbModalOpen] = useState(false);
+  const [fbItems, setFbItems] = useState([]);
+  const [fbProjectTitle, setFbProjectTitle] = useState('');
+  // Funding compose modal
+  const [fundCompose, setFundCompose] = useState({ show: false, research: null, amount: '', justification: '' });
+
+  const openFeedbacks = (supervision) => {
+    const items = Array.isArray(supervision?.feedbacks) ? supervision.feedbacks : [];
+    setFbItems(items);
+    setFbProjectTitle(supervision?.projectTitle || '');
+    setFbModalOpen(true);
+  };
+
+  const findResearchByTitle = (title) => {
+    const list = profile?.researcher?.researches || [];
+    return list.find((r) => r.title === title);
+  };
+
+  const openFundingCompose = (supervision) => {
+    const research = findResearchByTitle(supervision?.projectTitle);
+    if (!research) {
+      alert('Related research not found to submit funding');
+      return;
+    }
+    const existing = fundForm[research._id] || {};
+    setFundCompose({ show: true, research, amount: existing.amount || '', justification: existing.justification || '' });
+  };
+
+  const submitFundingCompose = async () => {
+    if (!fundCompose.research) return;
+    setFundForm((m) => ({ ...m, [fundCompose.research._id]: { amount: fundCompose.amount, justification: fundCompose.justification } }));
+    await handleFundingSubmit(fundCompose.research);
+    setFundCompose({ show: false, research: null, amount: '', justification: '' });
+  };
 
   // --- Helpers: API fetches and actions ---
   const fetchMySupervisions = async () => {
@@ -77,6 +121,48 @@ const ResearcherDashboard = () => {
         setSupervisionByTitle(map);
       }
     } catch (e) {}
+  };
+
+  // ---- Read-only document helpers ----
+  const getFilenameFromHeader = (cd) => {
+    if (!cd) return null;
+    const m = cd.match(/filename\*?=(?:UTF-8'')?["']?([^;"']+)/i);
+    return m ? decodeURIComponent(m[1]) : null;
+  };
+  const pathExtFromBlob = (blob) => {
+    const t = (blob && blob.type) || '';
+    if (t.includes('pdf')) return '.pdf';
+    if (t.includes('msword')) return '.doc';
+    if (t.includes('officedocument')) return '.docx';
+    return '';
+  };
+
+  const fetchDocumentForView = async (supervisionId, { download = false } = {}) => {
+    const token = localStorage.getItem('supervisorToken') || localStorage.getItem('researcherToken') || null;
+    const url = `http://localhost:5000/api/supervisions/research-document/${supervisionId}${download ? '?download=1' : ''}`;
+    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) {
+      let msg = `Failed to fetch document (${res.status})`;
+      try { const j = await res.json(); if (j?.message) msg = j.message } catch {}
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get('content-disposition');
+    const filename = getFilenameFromHeader(cd) || `document-${supervisionId}${pathExtFromBlob(blob)}`;
+    return { blob, filename, contentType: res.headers.get('content-type') || blob.type };
+  };
+
+  const openReadOnlyDoc = async (supervisionId) => {
+    try {
+      const { blob, filename } = await fetchDocumentForView(supervisionId, { download: false });
+      const url = window.URL.createObjectURL(blob);
+      setDocUrl(url);
+      setDocName(filename);
+      setDocModalOpen(true);
+    } catch (err) {
+      console.error('Open document error:', err);
+      alert(err.message || 'Error loading document');
+    }
   };
 
   const fetchDiscoverProjects = async () => {
@@ -111,6 +197,8 @@ const ResearcherDashboard = () => {
     try {
       const token = localStorage.getItem("researcherToken");
       if (!token) throw new Error("Not authenticated");
+      if (!newResearch.title || newResearch.title.trim().length < 3) throw new Error("Title must be at least 3 characters");
+      if (!newResearch.description || newResearch.description.trim().length < 10) throw new Error("Description must be at least 10 characters");
       const domains = [];
       if (newResearch.domainMain && newResearch.domainMain !== "Other") domains.push(newResearch.domainMain);
       if (newResearch.domainMain === "Other" && newResearch.domainOther.trim()) domains.push(newResearch.domainOther.trim());
@@ -160,7 +248,7 @@ const ResearcherDashboard = () => {
   const requestSupervision = async (research, supervisorId) => {
     try {
       const token = localStorage.getItem("researcherToken");
-      const res = await fetch(`http://localhost:5000/api/researchers/research/${research._id}/request-supervision`, {
+      const res = await fetch(`http://localhost:5000/api/supervisions/research/${research._id}/request-supervision`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ supervisorId }),
@@ -201,26 +289,33 @@ const ResearcherDashboard = () => {
 
   const handleFundingSubmit = async (research) => {
     const form = fundForm[research._id] || {};
-    if (!form.amount || !form.justification) {
+    const amount = parseFloat(form.amount);
+    if (!amount || isNaN(amount) || amount <= 0) {
+      setToasts((t) => [...t, { id: Date.now(), bg: "warning", text: "Enter a valid amount greater than 0" }]);
+      return;
+    }
+    if (!form.justification || String(form.justification).trim().length < 10) {
       setToasts((t) => [...t, { id: Date.now(), bg: "warning", text: "Enter amount and justification" }]);
       return;
     }
     try {
+      const token = localStorage.getItem("researcherToken");
       const body = {
         projectTitle: research.title,
         researcher: profile?.researcher?._id,
         supervisor: supervisionByTitle[research.title]?.supervisor?._id,
         department: profile?.researcher?.department || "",
-        requestedAmount: parseFloat(form.amount),
+        requestedAmount: amount,
         justification: form.justification,
         documents: [],
       };
       const res = await fetch("http://localhost:5000/api/funding", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to submit funding request");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Failed to submit funding request");
       await fetchFundingRequests();
       setToasts((t) => [...t, { id: Date.now(), bg: "success", text: "Funding request submitted" }]);
       setFundingModal({ show: true, research });
@@ -532,8 +627,70 @@ const ResearcherDashboard = () => {
         </Nav>
       </div>
 
+      {/* Read-only Document Modal */}
+      {docModalOpen && (
+        <Modal
+          show={docModalOpen}
+          onHide={() => {
+            setDocModalOpen(false);
+            if (docUrl) { window.URL.revokeObjectURL(docUrl); setDocUrl(null); setDocName(null); }
+          }}
+          size="lg"
+          aria-labelledby="doc-modal"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title id="doc-modal">{docName || 'Research Document'}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body style={{ minHeight: '60vh' }}>
+            {docUrl ? (
+              <iframe title="research-document" src={docUrl} style={{ width: '100%', height: '70vh', border: 'none' }} />
+            ) : (
+              <div className="text-center">Loading...</div>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="light" onClick={() => {
+              setDocModalOpen(false);
+              if (docUrl) { window.URL.revokeObjectURL(docUrl); setDocUrl(null); setDocName(null); }
+            }}>Close</Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
       {/* Main Content */}
       <div className="flex-grow-1 p-4">
+        {/* Top Header Bar (non-invasive) */}
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <h3 className="mb-0" style={{ color: '#0d3b66' }}>
+              {activeTab === 'dashboard' && 'Dashboard'}
+              {activeTab === 'pending' && 'Pending Requests'}
+              {activeTab === 'active' && 'Active Research'}
+              {activeTab === 'completed' && 'Completed Projects'}
+              {activeTab === 'profile' && 'Profile'}
+            </h3>
+            <small className="text-muted">
+              {activeTab === 'dashboard' && 'Overview and quick stats'}
+              {activeTab === 'pending' && 'Requests awaiting supervisor response'}
+              {activeTab === 'active' && 'Your ongoing supervised project'}
+              {activeTab === 'completed' && 'Finished projects and funding'}
+              {activeTab === 'profile' && 'Your profile information'}
+            </small>
+          </div>
+          <div className="d-flex align-items-center gap-2">
+            <div className="input-group" style={{ maxWidth: 260 }}>
+              <span className="input-group-text bg-white"><Search size={16} /></span>
+              <input className="form-control" placeholder="Search..." />
+            </div>
+            <Button variant="light" className="rounded-circle p-2"><Bell /></Button>
+            <Button variant="light" className="rounded-circle p-2"><Envelope /></Button>
+            <div className="d-flex align-items-center ms-1">
+              <div className="bg-secondary rounded-circle me-2" style={{ width: 32, height: 32 }} />
+              <span className="fw-semibold d-none d-md-inline">{profile?.researcher?.fullName || 'Researcher'}</span>
+              <Button variant="light" className="ms-1 p-1"><ThreeDotsVertical /></Button>
+            </div>
+          </div>
+        </div>
         {activeTab === 'dashboard' && (
           <Container className="px-0">
             <Row className="mb-4">
@@ -670,9 +827,17 @@ const ResearcherDashboard = () => {
                                     <Badge key={i} bg="secondary" className="me-1">{d}</Badge>
                                   ))}
                                 </td>
-                                <td>{r.researcher?.fullName || '-'}</td>
+                                <td>{getDisplayName(r.researcher)}</td>
                                 <td>
-                                  <Button size="sm" style={{ backgroundColor: '#00798c', borderColor: '#00798c' }} onClick={() => openSupervisors(r)}>Find Supervisors</Button>
+                                  <Button
+                                    size="sm"
+                                    className="me-2"
+                                    style={{ backgroundColor: '#00798c', borderColor: '#00798c' }}
+                                    onClick={() => openReadOnlyDoc(r.supervisionRef || r._id)}
+                                    title={r.supervisionRef ? 'Open document' : 'Open document (research id)'}
+                                  >
+                                    Read Document
+                                  </Button>
                                 </td>
                               </tr>
                             ))}
@@ -685,154 +850,102 @@ const ResearcherDashboard = () => {
               </Col>
             </Row>
 
-            {/* Current Active Project */}
-            {(profile?.currentSupervision || activeProject) && (
+            {/* Active Project */}
+            {((supervisions || []).some((s) => s.status === 'Current')) && (
               <Row className="mb-4">
                 <Col>
-                  <Card className="custom-card shadow-lg border-0" ref={activeRef}>
+                  <Card className="custom-card shadow border-0">
                     <Card.Header className="custom-card-header">
-                      <h5 className="mb-0 d-flex align-items-center"><Users className="me-2" /> Current Active Project</h5>
+                      <h5 className="mb-0">Active Project</h5>
                     </Card.Header>
                     <Card.Body>
-                      <Row>
-                        <Col md={6}>
-                          <p><strong>Research:</strong> {activeProject?.title || profile.currentSupervision.projectTitle}</p>
-                          <p><strong>Supervisor:</strong> {profile.currentSupervision?.supervisor?.fullName || "-"}</p>
-                        </Col>
-                        <Col md={6}>
-                          <p><strong>Status:</strong> {getStatusBadge(activeProject?.status || profile.currentSupervision?.status)}</p>
-                          <p><strong>Started:</strong> {new Date((profile.currentSupervision?.createdAt || activeProject?.createdAt) || Date.now()).toLocaleDateString()}</p>
-                          <p><strong>Supervisor:</strong> {assignedSupervisorName || '-'}</p>
-                        </Col>
-                      </Row>
-                      {(coActors?.length || 0) > 0 && (
-                        <>
-                          <hr />
-                          <h6>Co-actors</h6>
-                          {(coActors || []).map((r) => (
-                            <Button key={r._id} size="sm" variant="outline-secondary" className="me-2 mb-2" onClick={() => openCoactorSupervisor(r)}>
-                              {r.fullName}
-                            </Button>
-                          ))}
-                        </>
-                      )}
-                      <hr />
-                      <Row>
-                        <Col md={6} className="mb-3">
-                          <h6>Supervisor Feedback</h6>
-                          {profile?.currentSupervision?.feedbacks?.length ? (
-                            <ListGroup>
-                              {profile.currentSupervision.feedbacks.map((f, idx) => (
-                                <ListGroup.Item key={idx}>
-                                  <div className="small text-muted">{new Date(f.date).toLocaleString()}</div>
-                                  <div>{f.comment}</div>
-                                </ListGroup.Item>
-                              ))}
-                            </ListGroup>
-                          ) : (
-                            <p className="text-muted mb-0">No feedback yet.</p>
-                          )}
-                        </Col>
-                        <Col md={6}>
-                          <h6>System Assigned Papers</h6>
-                          {assignedPapers.length === 0 ? (
-                            <p className="text-muted mb-2">No assigned papers.</p>
-                          ) : (
-                            <ListGroup className="mb-2">
-                              {assignedPapers.map((p) => (
-                                <ListGroup.Item key={p.id}>
-                                  <a href={p.url} target="_blank" rel="noreferrer" style={{ color: '#00798c' }}>{p.title}</a>
-                                </ListGroup.Item>
-                              ))}
-                            </ListGroup>
-                          )}
-
-                          <h6 className="mt-3">Upload Your Paper</h6>
-                          {uploadState.error && <Alert variant="danger">{uploadState.error}</Alert>}
-                          {uploadState.success && <Alert variant="success">{uploadState.success}</Alert>}
-                          <Form onSubmit={handlePaperUpload} className="d-grid gap-2">
-                            <Form.Control as="textarea" rows={2} placeholder="Specific details..." value={uploadState.details} onChange={(e) => setUploadState((s) => ({ ...s, details: e.target.value }))} />
-                            <Form.Control type="file" accept=".pdf,.doc,.docx" onChange={(e) => setUploadState((s) => ({ ...s, file: e.target.files?.[0] || null }))} />
-                            <Button type="submit" style={{ backgroundColor: '#00798c', borderColor: '#00798c' }} disabled={uploadState.uploading || !uploadState.file}>{uploadState.uploading ? "Uploading..." : "Upload"}</Button>
-                          </Form>
-                          {myUploads.length > 0 && (
-                            <div className="mt-2">
-                              <div className="small text-muted mb-1">Your uploads</div>
-                              <ListGroup>
-                                {myUploads.map((u) => (
-                                  <ListGroup.Item key={u.id} className="d-flex justify-content-between align-items-start">
-                                    <div>
-                                      <div className="fw-semibold">{u.title}</div>
-                                      <div className="small text-muted">{u.details}</div>
-                                    </div>
-                                    <div className="small text-muted">{new Date(u.uploadedAt).toLocaleString()}</div>
-                                  </ListGroup.Item>
-                                ))}
-                              </ListGroup>
+                      {(() => {
+                        const s = (supervisions || []).find((x) => x.status === 'Current');
+                        if (!s) return <p className="text-muted mb-0">No active project.</p>;
+                        return (
+                          <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+                            <div className="mb-3 mb-md-0">
+                              <div><strong>Title:</strong> {s.projectTitle}</div>
+                              <div><strong>Supervisor:</strong> {s.supervisor?.fullName || s.supervisor?.name || '-'}</div>
+                              <div><strong>Status:</strong> {getStatusBadge(s.status)}</div>
+                              <div><strong>Started:</strong> {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '-'}</div>
+                              {s.feasibility && (
+                                <div><strong>Feasibility:</strong> {s.feasibility}</div>
+                              )}
+                              {typeof s.viabilityStatus?.isViable === 'boolean' && (
+                                <div><strong>Viability:</strong> {s.viabilityStatus.isViable ? 'Viable' : 'Not Viable'}</div>
+                              )}
                             </div>
-                          )}
-                        </Col>
-                      </Row>
-                      <Button 
-                        style={{ backgroundColor: '#00798c', borderColor: '#00798c' }}
-                        onClick={() => navigate(`/researcher/supervision/${profile.currentSupervision?._id || "current"}`)}
-                      >
-                        View Details
-                      </Button>
+                            <div className="d-flex gap-2">
+                              <Button size="sm" style={{ backgroundColor: '#00798c', borderColor: '#00798c' }} onClick={() => openReadOnlyDoc(s._id)}>Read Document</Button>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </Card.Body>
                   </Card>
                 </Col>
               </Row>
             )}
 
-            {/* My Research Projects */}
+            {/* Completed Projects */}
             <Row>
               <Col>
                 <Card className="custom-card shadow border-0">
                   <Card.Header className="custom-card-header">
-                    <h5 className="mb-0"><BookOpen className="me-2" /> My Research Projects</h5>
+                    <h5 className="mb-0">Completed Projects</h5>
                   </Card.Header>
-                  <Card.Body>
-                    {yourProjects.length === 0 ? (
-                      <p className="text-muted text-center">No research projects found</p>
-                    ) : (
-                      <div className="table-responsive">
-                        <table className="table table-hover">
-                          <thead>
-                            <tr>
-                              <th>Title</th>
-                              <th>Domains</th>
-                              <th>Status</th>
-                              <th>Action</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {yourProjects.map((research) => (
-                              <tr key={research._id}>
-                                <td>{research.title}</td>
-                                <td>
-                                  {research.domains?.map((domain, idx) => (
-                                    <Badge key={idx} bg="info" className="me-1">{domain}</Badge>
-                                  ))}
-                                </td>
-                                <td>{getStatusBadge(research.status)}</td>
-                                <td>
-                                  {research.status === 'Finished' ? (
-                                    <Button size="sm" variant="outline-secondary" onClick={() => setFundingModal({ show: true, research })}>Funding</Button>
-                                  ) : research.status === 'Current' ? (
-                                    <Button size="sm" variant="outline-primary" onClick={() => activeRef.current?.scrollIntoView({ behavior: 'smooth' })}>View</Button>
-                                  ) : research.status === 'Pending' ? (
-                                    <></>
-                                  ) : (
-                                    <Button size="sm" variant="outline-primary" onClick={() => navigate(`/researcher/research/${research._id}`)}>View</Button>
-                                  )}
-                                </td>
+                  <Card.Body className="p-0">
+                    {(() => {
+                      const finished = (supervisions || []).filter((s) => s.status === 'Finished');
+                      if (!finished.length) return <p className="text-muted p-3 mb-0">No completed projects.</p>;
+                      return (
+                        <div className="table-responsive">
+                          <table className="table table-hover mb-0 align-middle">
+                            <thead>
+                              <tr>
+                                <th>Title</th>
+                                <th>Supervisor</th>
+                                <th>Feasibility</th>
+                                <th>Viability</th>
+                                <th>Completed</th>
+                                <th>Action</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
+                            </thead>
+                            <tbody>
+                              {finished.map((s) => (
+                                <tr key={s._id}>
+                                  <td>{s.projectTitle}</td>
+                                  <td>{s.supervisor?.fullName || s.supervisor?.name || '-'}</td>
+                                  <td>{s.feasibility || '-'}</td>
+                                  <td>{typeof s.viabilityStatus?.isViable === 'boolean' ? (s.viabilityStatus.isViable ? 'Viable' : 'Not Viable') : '-'}</td>
+                                  <td>{s.updatedAt ? new Date(s.updatedAt).toLocaleDateString() : '-'}</td>
+                                  <td>
+                                    <div className="d-flex gap-2">
+                                      <Button size="sm" variant="outline-primary" onClick={() => openReadOnlyDoc(s._id)}>Read</Button>
+                                      <Button size="sm" variant="outline-secondary" onClick={() => openFeedbacks(s)}>Feedback</Button>
+                                      {((s.feasibility === 'Feasible') || (s.viabilityStatus?.isViable === true)) && (
+                                        <Button
+                                          size="sm"
+                                          style={{ backgroundColor: '#00798c', borderColor: '#00798c' }}
+                                          onClick={() => {
+                                            const r = findResearchByTitle(s.projectTitle);
+                                            if (!r) return alert('Related research not found to submit funding');
+                                            handleFundingSubmit(r);
+                                          }}
+                                        >
+                                          Request Funding
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
                   </Card.Body>
                 </Card>
               </Col>
@@ -870,69 +983,33 @@ const ResearcherDashboard = () => {
             <Col>
               <Card className="custom-card shadow border-0">
                 <Card.Header className="custom-card-header">
-                  <h5 className="mb-0">Active Research</h5>
+                  <h5 className="mb-0">Active Project</h5>
                 </Card.Header>
                 <Card.Body>
-                  {loadingActive ? (
-                    <div className="text-center"><Spinner animation="border" style={{ color: '#00798c' }} /></div>
-                  ) : activeError ? (
-                    <Alert variant="danger" className="mb-0">{activeError}</Alert>
-                  ) : activeList.length === 0 ? (
-                    <p className="text-muted mb-0">No active research</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead>
-                          <tr>
-                            <th>Title</th>
-                            <th>Start Date</th>
-                            <th>Supervisor</th>
-                            <th>Co-Researchers</th>
-                            <th>Paper</th>
-                            <th>Comments</th>
-                            <th>Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {activeList.map((r) => (
-                            <tr key={r._id}>
-                              <td>{r.title}</td>
-                              <td>{r.startDate ? new Date(r.startDate).toLocaleDateString() : '-'}</td>
-                              <td>{r.supervisor?.name || '-'}</td>
-                              <td>
-                                {(r.coResearchers || []).length === 0 ? (
-                                  <span className="text-muted">None</span>
-                                ) : (
-                                  (r.coResearchers || []).map((c, i) => (
-                                    <Button key={c._id || i} size="sm" variant="outline-secondary" className="me-1 mb-1" onClick={() => openCoactorSupervisor(c)}>
-                                      {c.name || c.fullName || c.email}
-                                    </Button>
-                                  ))
-                                )}
-                              </td>
-                              <td>
-                                <div className="d-flex align-items-center gap-2">
-                                  <Form.Control size="sm" type="file" accept=".pdf,.doc,.docx" onChange={(e) => setActiveUploads((m) => ({ ...m, [r._id]: e.target.files?.[0] || null }))} />
-                                  <Button size="sm" style={{ backgroundColor: '#00798c', borderColor: '#00798c' }} disabled={!activeUploads[r._id]} onClick={() => setToasts((t)=>[...t,{id:Date.now(),bg:"success",text:"Paper selected (stub)."}])}>Upload</Button>
-                                  {r.researchPaper ? (
-                                    <a href={r.researchPaper} target="_blank" rel="noreferrer" style={{ color: '#00798c' }}>Open</a>
-                                  ) : (
-                                    <span className="text-muted">None</span>
-                                  )}
-                                </div>
-                              </td>
-                              <td>
-                                <Button size="sm" variant="outline-primary" onClick={() => activeRef.current?.scrollIntoView({ behavior: 'smooth' })}>View</Button>
-                              </td>
-                              <td>
-                                <Button size="sm" variant="outline-primary" onClick={() => activeRef.current?.scrollIntoView({ behavior: 'smooth' })}>View</Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                  {(() => {
+                    const s = (supervisions || []).find((x) => x.status === 'Current');
+                    if (!s) return <p className="text-muted mb-0">No active project.</p>;
+                    return (
+                      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+                        <div className="mb-3 mb-md-0">
+                          <div><strong>Title:</strong> {s.projectTitle}</div>
+                          <div><strong>Supervisor:</strong> {s.supervisor?.fullName || s.supervisor?.name || '-'}</div>
+                          <div><strong>Status:</strong> {getStatusBadge(s.status)}</div>
+                          <div><strong>Started:</strong> {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '-'}</div>
+                          {s.feasibility && (
+                            <div><strong>Feasibility:</strong> {s.feasibility}</div>
+                          )}
+                          {typeof s.viabilityStatus?.isViable === 'boolean' && (
+                            <div><strong>Viability:</strong> {s.viabilityStatus.isViable ? 'Viable' : 'Not Viable'}</div>
+                          )}
+                        </div>
+                        <div className="d-flex gap-2">
+                          <Button size="sm" style={{ backgroundColor: '#00798c', borderColor: '#00798c' }} onClick={() => openReadOnlyDoc(s._id)}>Read Document</Button>
+                          <Button size="sm" variant="outline-secondary" onClick={() => openFeedbacks(s)}>Feedback</Button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </Card.Body>
               </Card>
             </Col>
@@ -946,75 +1023,53 @@ const ResearcherDashboard = () => {
                 <Card.Header className="custom-card-header">
                   <h5 className="mb-0">Completed Projects</h5>
                 </Card.Header>
-                <Card.Body>
-                  {completedProjects.length === 0 ? (
-                    <p className="text-muted mb-0">No completed projects yet</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead>
-                          <tr>
-                            <th>Title</th>
-                            <th>Domains</th>
-                            <th>Status</th>
-                            <th>Funding Request</th>
-                            <th>Approval</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {completedProjects.map((research) => (
-                            <tr key={research._id}>
-                              <td>{research.title}</td>
-                              <td>
-                                {research.domains?.map((domain, idx) => (
-                                  <Badge key={idx} bg="info" className="me-1">{domain}</Badge>
-                                ))}
-                              </td>
-                              <td>{getStatusBadge(research.status)}</td>
-                              <td>
-                                {(() => {
-                                  const sup = supervisionByTitle[research.title];
-                                  const canRequest = sup?.status === 'Finished' && sup?.feasibility === 'Feasible';
-                                  if (!canRequest) return <span className="text-muted">Unavailable</span>;
-                                  return (
-                                    <div className="d-flex flex-column gap-2" style={{ minWidth: 260 }}>
-                                      <Form.Control
-                                        type="number"
-                                        placeholder="Requested amount"
-                                        value={fundForm[research._id]?.amount || ''}
-                                        onChange={(e) => setFundForm((m) => ({ ...m, [research._id]: { ...(m[research._id]||{}), amount: e.target.value } }))}
-                                      />
-                                      <Form.Control
-                                        as="textarea"
-                                        rows={2}
-                                        placeholder="Justification"
-                                        value={fundForm[research._id]?.justification || ''}
-                                        onChange={(e) => setFundForm((m) => ({ ...m, [research._id]: { ...(m[research._id]||{}), justification: e.target.value } }))}
-                                      />
-                                      <Button size="sm" style={{ backgroundColor: '#00798c', borderColor: '#00798c' }} onClick={() => handleFundingSubmit(research)}>Submit</Button>
-                                    </div>
-                                  );
-                                })()}
-                              </td>
-                              <td>
-                                {fundingStatuses[research._id]?.status ? (
-                                  <Badge bg={
-                                    fundingStatuses[research._id].status === 'approved' ? 'success' :
-                                    fundingStatuses[research._id].status === 'rejected' ? 'danger' :
-                                    fundingStatuses[research._id].status === 'pending' ? 'warning' : 'secondary'
-                                  }>
-                                    {fundingStatuses[research._id].status}
-                                  </Badge>
-                                ) : (
-                                  <Badge bg="secondary">none</Badge>
-                                )}
-                              </td>
+                <Card.Body className="p-0">
+                  {(() => {
+                    const finished = (supervisions || []).filter((s) => s.status === 'Finished');
+                    if (!finished.length) return <p className="text-muted p-3 mb-0">No completed projects yet</p>;
+                    return (
+                      <div className="table-responsive">
+                        <table className="table table-hover mb-0 align-middle">
+                          <thead>
+                            <tr>
+                              <th>Title</th>
+                              <th>Supervisor</th>
+                              <th>Feasibility</th>
+                              <th>Viability</th>
+                              <th>Completed</th>
+                              <th>Actions</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                          </thead>
+                          <tbody>
+                            {finished.map((s) => (
+                              <tr key={s._id}>
+                                <td>{s.projectTitle}</td>
+                                <td>{s.supervisor?.fullName || s.supervisor?.name || '-'}</td>
+                                <td>{s.feasibility || '-'}</td>
+                                <td>{typeof s.viabilityStatus?.isViable === 'boolean' ? (s.viabilityStatus.isViable ? 'Viable' : 'Not Viable') : '-'}</td>
+                                <td>{s.updatedAt ? new Date(s.updatedAt).toLocaleDateString() : '-'}</td>
+                                <td>
+                                  <div className="d-flex flex-wrap gap-2">
+                                    <Button size="sm" variant="outline-primary" onClick={() => openReadOnlyDoc(s._id)}>Read</Button>
+                                    <Button size="sm" variant="outline-secondary" onClick={() => openFeedbacks(s)}>Feedback</Button>
+                                    {((s.feasibility === 'Feasible') || (s.viabilityStatus?.isViable === true)) && (
+                                      <Button
+                                        size="sm"
+                                        style={{ backgroundColor: '#00798c', borderColor: '#00798c' }}
+                                        onClick={() => openFundingCompose(s)}
+                                      >
+                                        Request Funding
+                                      </Button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()}
                 </Card.Body>
               </Card>
             </Col>
@@ -1069,6 +1124,82 @@ const ResearcherDashboard = () => {
           <Button variant="secondary" onClick={() => setFundingModal({ show: false, research: null })}>Close</Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Feedback Modal */}
+      {fbModalOpen && (
+        <Modal
+          show={fbModalOpen}
+          onHide={() => setFbModalOpen(false)}
+          size="md"
+          aria-labelledby="fb-modal"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title id="fb-modal">Supervisor Feedback {fbProjectTitle ? `- ${fbProjectTitle}` : ''}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {(!fbItems || fbItems.length === 0) ? (
+              <div className="text-muted">No feedback available.</div>
+            ) : (
+              <ListGroup>
+                {fbItems.map((f, idx) => (
+                  <ListGroup.Item key={idx}>
+                    <div className="small text-muted">{f.date ? new Date(f.date).toLocaleString() : ''}</div>
+                    <div>{f.comment}</div>
+                  </ListGroup.Item>
+                ))}
+              </ListGroup>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="light" onClick={() => setFbModalOpen(false)}>Close</Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {/* Funding Compose Modal */}
+      {fundCompose.show && (
+        <Modal
+          show={fundCompose.show}
+          onHide={() => setFundCompose({ show: false, research: null, amount: '', justification: '' })}
+          centered
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>Request Funding</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {fundCompose.research && (
+              <div className="mb-3">
+                <div className="mb-1"><strong>Project:</strong> {fundCompose.research.title}</div>
+                <small className="text-muted">Provide requested amount and justification</small>
+              </div>
+            )}
+            <Form.Group className="mb-3">
+              <Form.Label>Amount</Form.Label>
+              <Form.Control
+                type="number"
+                value={fundCompose.amount}
+                onChange={(e) => setFundCompose((s) => ({ ...s, amount: e.target.value }))}
+                placeholder="Requested amount"
+                min="0"
+              />
+            </Form.Group>
+            <Form.Group>
+              <Form.Label>Justification</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={fundCompose.justification}
+                onChange={(e) => setFundCompose((s) => ({ ...s, justification: e.target.value }))}
+                placeholder="Explain the need and allocation plan"
+              />
+            </Form.Group>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setFundCompose({ show: false, research: null, amount: '', justification: '' })}>Cancel</Button>
+            <Button style={{ backgroundColor: '#00798c', borderColor: '#00798c' }} onClick={submitFundingCompose}>Submit</Button>
+          </Modal.Footer>
+        </Modal>
+      )}
 
       {/* Create Research Modal */}
       <Modal show={createModal.show} onHide={() => setCreateModal({ show: false })} centered>

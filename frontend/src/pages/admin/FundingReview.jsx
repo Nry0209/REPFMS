@@ -86,12 +86,15 @@ const FundingReview = () => {
       console.log('Starting to fetch data from:', { fundingUrl, budgetUrl });
       
       // Fetch funding requests and budget in parallel
+      const adminToken = localStorage.getItem('adminToken');
+      const authHeader = adminToken ? { Authorization: `Bearer ${adminToken}` } : {};
       const [requestsResponse, budgetResponse] = await Promise.all([
         fetch(fundingUrl, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
+            ...authHeader,
           },
           credentials: 'include',
         })
@@ -126,6 +129,7 @@ const FundingReview = () => {
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
+            ...authHeader,
           },
           credentials: 'include',
         })
@@ -165,9 +169,9 @@ const FundingReview = () => {
 
       // Process budget data
       const budgetData = budgetResponse.data || {
-        totalBudget: 1000000,
+        totalBudget: 0,
         allocated: 0,
-        remaining: 1000000
+        remaining: 0
       };
 
       console.log('Successfully fetched data:', {
@@ -203,9 +207,9 @@ const FundingReview = () => {
       // Reset to empty state on error
       setFundingRequests([]);
       setBudgetAllocation({
-        totalBudget: 1000000,
+        totalBudget: 0,
         allocated: 0,
-        remaining: 1000000
+        remaining: 0
       });
     } finally {
       setLoading(false);
@@ -368,7 +372,7 @@ const FundingReview = () => {
     setShowForm(true);
   };
 
-  const handleStatusChange = async (id, status, recommendedAmount = null) => {
+  const handleStatusChange = async (id, status, recommendedAmount = null, reason = '') => {
     try {
       // Optimistically update the UI
       setFundingRequests(prevRequests => 
@@ -388,15 +392,18 @@ const FundingReview = () => {
         }));
       }
 
-      // Make the API call
-      const response = await fetch(`http://localhost:5000/api/funding/status/${id}`, {
-        method: 'PATCH',
+      // Make the API call to approve/reject endpoint
+      const adminToken = localStorage.getItem('adminToken');
+      const response = await fetch(`http://localhost:5000/api/funding/${id}/approve`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {}),
         },
         body: JSON.stringify({
-          status,
-          recommendedAmount: recommendedAmount || undefined
+          approved: status === 'approved',
+          amountAllocated: recommendedAmount != null ? Number(recommendedAmount) : undefined,
+          reason,
         }),
         credentials: 'include',
       });
@@ -405,14 +412,16 @@ const FundingReview = () => {
         throw new Error('Failed to update status');
       }
 
-      const updatedRequest = await response.json();
+      const { data: updatedRequest } = await response.json();
       
       // Update local state with server response
-      setFundingRequests(prevRequests => 
-        prevRequests.map(req => 
-          req._id === updatedRequest._id ? updatedRequest : req
-        )
-      );
+      if (updatedRequest) {
+        setFundingRequests(prevRequests => 
+          prevRequests.map(req => 
+            req._id === updatedRequest._id ? updatedRequest : req
+          )
+        );
+      }
 
       // Show success message
       toast.success(`Request ${status} successfully`);

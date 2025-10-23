@@ -4,8 +4,25 @@ import FundingRequest from '../models/FundingRequest.js';
 import Researcher from '../models/Researcher.js';
 import Supervisor from '../models/Supervisor.js';
 import Supervision from '../models/Supervision.js';
+import Notification from '../models/Notification.js';
+import jwt from 'jsonwebtoken';
 
 const router = express.Router();
+
+// Minimal token verification (aligns with supervisionRoutes)
+const verifyToken = (req, res, next) => {
+  const authHeader = req.header('Authorization');
+  if (!authHeader) return res.status(401).json({ success: false, message: 'No token provided' });
+  const token = authHeader.replace('Bearer ', '');
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.userId = decoded.id || decoded.supervisorId || decoded.userId;
+    req.role = decoded.role;
+    next();
+  } catch (err) {
+    return res.status(401).json({ success: false, message: 'Invalid token' });
+  }
+};
 
 // @desc    Get all funding requests
 // @route   GET /api/funding
@@ -226,11 +243,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// @desc    Create a new funding request
-// @route   POST /api/funding-requests
-// @access  Private/Admin
-
-router.post('/', async (req, res) => {
+// Researcher creates funding request (also used by admin)
+router.post('/', verifyToken, async (req, res) => {
   try {
     const {
       projectTitle,
@@ -299,6 +313,29 @@ router.post('/', async (req, res) => {
     // Mark supervision as fundingRequested to prevent duplicates
     supervision.fundingRequested = true;
     await supervision.save();
+
+    // Notifications: supervisor and admins
+    try {
+      if (supervisorId) {
+        await Notification.create({
+          forRole: 'supervisor',
+          forRoleRef: 'Supervisor',
+          forUser: supervisorId,
+          type: 'funding_request',
+          message: `New funding request for "${projectTitle}" submitted by researcher`,
+          payload: { fundingId: String(createdRequest._id) },
+        });
+      }
+      await Notification.create({
+        forRole: 'admin',
+        forRoleRef: 'Admin',
+        type: 'funding_request_admin',
+        message: `Funding request for "${projectTitle}" submitted`,
+        payload: { fundingId: String(createdRequest._id) },
+      });
+    } catch (e) {
+      console.error('Funding request notification error:', e);
+    }
     
     // Populate the response with basic details
     const response = createdRequest.toObject();
@@ -309,6 +346,159 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error('Error creating funding request:', error);
     res.status(500).json({ message: 'Error creating funding request', error: error.message });
+  }
+});
+
+// Supervisor: list funding requests pending validation
+router.get('/supervisor/pending', verifyToken, async (req, res) => {
+  try {
+    const claimedRole = String(req.role || '').toLowerCase();
+    const supId = req.userId;
+    // Allow if JWT role is supervisor OR if the userId corresponds to a Supervisor document
+    let isSupervisor = claimedRole === 'supervisor';
+    if (!isSupervisor) {
+      try {
+        isSupervisor = !!(await Supervisor.exists({ _id: supId }));
+      } catch (_) {
+        isSupervisor = false;
+      }
+    }
+    if (!isSupervisor) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const frs = await FundingRequest.find({ supervisor: supId, status: 'pending' })
+      .populate('researcher', 'fullName email')
+      .lean();
+    return res.json({ success: true, data: frs });
+  } catch (err) {
+    console.error('GET /funding/supervisor/pending error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Supervisor validates funding request
+router.put('/:id/validate-by-supervisor', verifyToken, async (req, res) => {
+  try {
+    const fr = await FundingRequest.findById(req.params.id);
+    if (!fr) return res.status(404).json({ success: false, message: 'Funding request not found' });
+    if (String(fr.supervisor) !== String(req.userId) && String(req.role).toLowerCase() !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+    const { validated, reason } = req.body || {};
+    fr.validatedBySupervisor = !!validated;
+    fr.supervisorValidationNote = reason || '';
+    fr.supervisorValidatedAt = new Date();
+    fr.status = validated ? 'pending' : 'rejected';
+    await fr.save();
+
+    // notify researcher and admins (if validated)
+    try {
+      await Notification.create({
+        forRole: 'researcher',
+        forRoleRef: 'Researcher',
+        forUser: fr.researcher,
+        type: 'funding_validation_by_supervisor',
+        message: validated ? `Supervisor validated your funding request for "${fr.projectTitle}"` : `Supervisor rejected your funding request for "${fr.projectTitle}": ${reason || ''}`,
+        payload: { fundingId: String(fr._id) },
+      });
+      if (validated) {
+        await Notification.create({
+          forRole: 'admin',
+          forRoleRef: 'Admin',
+          type: 'funding_await_admin',
+          message: `Funding request "${fr.projectTitle}" validated by supervisor and awaits admin decision`,
+          payload: { fundingId: String(fr._id) },
+        });
+      }
+    } catch (e) {
+      console.error('Funding validation notification error:', e);
+    }
+
+    return res.json({ success: true, data: fr });
+  } catch (err) {
+    console.error('PUT /funding/:id/validate-by-supervisor error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Admin approves/rejects
+router.put('/:id/approve', verifyToken, async (req, res) => {
+  try {
+    if (String(req.role).toLowerCase() !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin only' });
+    }
+    const fr = await FundingRequest.findById(req.params.id);
+    if (!fr) return res.status(404).json({ success: false, message: 'Not found' });
+
+    const { approved, amountAllocated, reason } = req.body || {};
+    fr.status = approved ? 'approved' : 'rejected';
+    if (!approved && reason) {
+      fr.rejectionReason = reason;
+    }
+    if (approved) {
+      fr.recommendedAmount = amountAllocated != null ? Number(amountAllocated) : fr.recommendedAmount;
+      fr.approvedAt = new Date();
+    }
+    await fr.save();
+
+    // notify researcher
+    try {
+      await Notification.create({
+        forRole: 'researcher',
+        forRoleRef: 'Researcher',
+        forUser: fr.researcher,
+        type: 'funding_admin_decision',
+        message: approved ? `Your funding request "${fr.projectTitle}" was approved. Amount allocated: ${fr.recommendedAmount || amountAllocated || fr.requestedAmount}` : `Your funding request "${fr.projectTitle}" was rejected. ${reason || ''}`,
+        payload: { fundingId: String(fr._id) },
+      });
+    } catch (e) {
+      console.error('Funding admin decision notification error:', e);
+    }
+
+    return res.json({ success: true, data: fr });
+  } catch (err) {
+    console.error('PUT /funding/:id/approve error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Admin direct allocate without prior request
+router.post('/admin-create', verifyToken, async (req, res) => {
+  try {
+    if (String(req.role).toLowerCase() !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin only' });
+    }
+    const { projectTitle, researcher, supervisor, amountAllocated, reason, department } = req.body || {};
+    if (!projectTitle || !researcher) {
+      return res.status(400).json({ success: false, message: 'projectTitle and researcher are required' });
+    }
+    const fr = await FundingRequest.create({
+      projectTitle,
+      researcher,
+      supervisor,
+      department: department || '',
+      requestedAmount: Number(amountAllocated) || 0,
+      recommendedAmount: Number(amountAllocated) || 0,
+      status: 'approved',
+      justification: reason || '',
+    });
+    try {
+      await Notification.create({
+        forRole: 'researcher',
+        forRoleRef: 'Researcher',
+        forUser: researcher,
+        type: 'funding_direct_admin',
+        message: `Admin allocated funds (${amountAllocated}) to your research "${projectTitle}"`,
+        payload: { fundingId: String(fr._id) },
+      });
+    } catch (e) {
+      console.error('Funding admin-create notification error:', e);
+    }
+    return res.status(201).json({ success: true, data: fr });
+  } catch (err) {
+    console.error('POST /funding/admin-create error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

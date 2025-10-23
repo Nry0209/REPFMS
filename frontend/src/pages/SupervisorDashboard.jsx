@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Row, Col, Card, Button, Nav, Badge, Modal } from 'react-bootstrap';
+import { Bell, Envelope, ThreeDotsVertical, Search } from 'react-bootstrap-icons';
+import FundingRequestsList from '../components/FundingRequestsList.jsx';
 import { Document, Page, pdfjs } from 'react-pdf';
 import {
   HouseDoor,
@@ -11,7 +13,10 @@ import {
 } from 'react-bootstrap-icons';
 import { useNavigate } from 'react-router-dom';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.js',
+  import.meta.url,
+).toString();
 
 const SupervisorDashboard = ({ auth, setAuth }) => {
   const [requests, setRequests] = useState([]);
@@ -23,14 +28,19 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
+  const [viabilityStatus, setViabilityStatus] = useState({});
   const toggleSidebar = () => setSidebarOpen((s) => !s);
 
   const navigate = useNavigate();
 
+  // Display name helper
+  const getDisplayName = (u) => (u?.fullName || u?.name || u?.email || '-');
+
   const fetchRequests = useCallback(async () => {
     try {
+      const token = localStorage.getItem('supervisorToken');
       const res = await fetch('http://localhost:5000/api/supervisions/requests', {
-        headers: { Authorization: `Bearer ${auth?.token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       setRequests((data && (data.data || data.requests)) || []);
@@ -39,27 +49,44 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
     } finally {
       setLoading(false);
     }
-  }, [auth?.token]);
+  }, []);
 
   useEffect(() => {
-    if (auth?.token) fetchRequests();
-  }, [fetchRequests, auth?.token]);
+    fetchRequests();
+  }, [fetchRequests]);
 
   const handleViewDocument = useCallback(async (supervisionId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/supervisors/research-document/${supervisionId}`, {
-        headers: { Authorization: `Bearer ${auth?.token}` },
+      const token = localStorage.getItem('supervisorToken');
+      if (!token) throw new Error('Not authenticated');
+      const res = await fetch(`http://localhost:5000/api/supervisions/research-document/${supervisionId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/pdf'
+        },
       });
-      if (!res.ok) throw new Error('Failed to fetch document');
+      if (!res.ok) {
+        let message = 'Failed to fetch document';
+        try {
+          const errJson = await res.json();
+          if (errJson?.message) message = errJson.message;
+        } catch (_) {
+          // ignore JSON parse errors
+        }
+        throw new Error(message);
+      }
       const blob = await res.blob();
+      if (!blob || blob.size === 0) {
+        throw new Error('Document is empty');
+      }
       const url = window.URL.createObjectURL(blob);
       setSelectedDocument(url);
       setPageNumber(1);
     } catch (err) {
       console.error('Error fetching document:', err);
-      alert('Failed to load document');
+      alert(err.message || 'Failed to load document');
     }
-  }, [auth?.token]);
+  }, []);
 
   const handleStatusChange = async (id, status) => {
     try {
@@ -74,6 +101,72 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
     } catch (err) {
       console.error(err);
       alert('Error updating status');
+    }
+  };
+
+  // Supervisor funding validation handler
+  const handleSupervisorValidateFunding = async (fundingId, validated, reason) => {
+    if (typeof validated === 'boolean' && (!reason || String(reason).trim().length < 3)) {
+      alert('Please provide a brief reason (min 3 chars).');
+      return;
+    }
+    try {
+      const token = localStorage.getItem('supervisorToken') || auth?.token;
+      const res = await fetch(`http://localhost:5000/api/funding/${fundingId}/validate-by-supervisor`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ validated, reason })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || 'Failed');
+      alert('Funding validation submitted.');
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Validation failed');
+    }
+  };
+
+  const handleViabilityAssessment = async (researchId, isViable, comments = '') => {
+    if (!comments || String(comments).trim().length < 3) {
+      alert('Please enter comments (min 3 chars).');
+      return;
+    }
+    try {
+      const token = localStorage.getItem('supervisorToken');
+      const res = await fetch(`http://localhost:5000/api/supervisions/${researchId}/assess-viability`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          isViable,
+          comments,
+          completionStatus: 'Completed',
+          assessmentDate: new Date().toISOString()
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setViabilityStatus(prev => ({
+          ...prev,
+          [researchId]: { isViable, comments }
+        }));
+
+        setRequests(prev => prev.map(req =>
+          req._id === researchId
+            ? { ...req, status: 'Finished', viabilityAssessed: true }
+            : req
+        ));
+
+        alert(`Research has been marked as ${isViable ? 'viable' : 'not viable'} for funding`);
+      } else {
+        throw new Error(data?.message || 'Failed to save assessment');
+      }
+    } catch (err) {
+      console.error('Error assessing viability:', err);
+      alert('Failed to update viability status');
     }
   };
 
@@ -97,7 +190,11 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
   const handleFeedbackSave = async (id) => {
     try {
       const token = localStorage.getItem('supervisorToken');
-      const feedback = feedbackText[id];
+      const feedback = (feedbackText[id] || '').trim();
+      if (feedback.length < 3) {
+        alert('Feedback must be at least 3 characters.');
+        return;
+      }
       const res = await fetch(`http://localhost:5000/api/supervisions/update/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -119,6 +216,10 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
   };
 
   const handleFundingChange = async (id, viable, reason) => {
+    if (viable === false && (!reason || String(reason).trim().length < 3)) {
+      alert('Please provide a reason when marking Not Viable.');
+      return;
+    }
     try {
       const token = localStorage.getItem('supervisorToken');
       const feasibility = viable ? 'Feasible' : 'Not Feasible';
@@ -291,6 +392,38 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
 
       {/* Main Content */}
       <div className="flex-grow-1 p-4">
+        {/* Top Header Bar (non-invasive) */}
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <h3 className="mb-0" style={{ color: '#0d3b66' }}>
+              {activeTab === 'dashboard' && 'Dashboard'}
+              {activeTab === 'requests' && 'Supervision Requests'}
+              {activeTab === 'feedback' && 'Feedback'}
+              {activeTab === 'fundingRequest' && 'Funding Requests'}
+              {activeTab === 'profile' && 'Profile'}
+            </h3>
+            <small className="text-muted">
+              {activeTab === 'dashboard' && 'Overview of your supervisions and actions'}
+              {activeTab === 'requests' && 'Review and manage supervision requests'}
+              {activeTab === 'feedback' && 'Provide and view feedback for current supervisions'}
+              {activeTab === 'fundingRequest' && 'Validate researchers\' funding requests'}
+              {activeTab === 'profile' && 'Your profile information'}
+            </small>
+          </div>
+          <div className="d-flex align-items-center gap-2">
+            <div className="input-group" style={{ maxWidth: 260 }}>
+              <span className="input-group-text bg-white"><Search size={16} /></span>
+              <input className="form-control" placeholder="Search..." />
+            </div>
+            <Button variant="light" className="rounded-circle p-2"><Bell /></Button>
+            <Button variant="light" className="rounded-circle p-2"><Envelope /></Button>
+            <div className="d-flex align-items-center ms-1">
+              <div className="bg-secondary rounded-circle me-2" style={{ width: 32, height: 32 }} />
+              <span className="fw-semibold d-none d-md-inline">{dashboardName}</span>
+              <Button variant="light" className="ms-1 p-1"><ThreeDotsVertical /></Button>
+            </div>
+          </div>
+        </div>
         {activeTab === 'dashboard' && (
           <>
             <Card className="border-0 shadow" style={{ borderRadius: 16 }}>
@@ -350,7 +483,7 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
                       <React.Fragment key={req._id}>
                         <tr>
                           <td>{i + 1}</td>
-                          <td>{req.researcher?.fullName || req.researcher?.name}</td>
+                          <td>{getDisplayName(req.researcher)}</td>
                           <td>{req.projectTitle}</td>
                           <td>{req.durationMonths || 'N/A'}</td>
                           <td>{getStatusBadge(req.status)}</td>
@@ -388,33 +521,78 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
                           <tr>
                             <td colSpan="6">
                               <div className="p-3 bg-light border rounded" style={{ borderRadius: 12 }}>
-                                <h6 className="mb-2">Add Feedback</h6>
-                                <textarea
-                                  className="form-control mb-2"
-                                  placeholder="Provide feedback..."
-                                  value={feedbackText[req._id] || ''}
-                                  onChange={(e) =>
-                                    setFeedbackText({
-                                      ...feedbackText,
-                                      [req._id]: e.target.value,
-                                    })
-                                  }
-                                />
-                                <div className="d-flex gap-2">
-                                  <Button
-                                    variant="primary"
-                                    size="sm"
-                                    onClick={() => handleFeedbackSave(req._id)}
-                                  >
-                                    Save Feedback
-                                  </Button>
-                                  <Button
-                                    variant="outline-danger"
-                                    size="sm"
-                                    onClick={() => handleFeedbackDelete(req._id)}
-                                  >
-                                    Clear
-                                  </Button>
+                                <div className="mb-3">
+                                  <h6 className="mb-2">Supervision Feedback</h6>
+                                  <textarea
+                                    className="form-control mb-2"
+                                    placeholder="Provide feedback..."
+                                    value={feedbackText[req._id] || ''}
+                                    onChange={(e) =>
+                                      setFeedbackText({
+                                        ...feedbackText,
+                                        [req._id]: e.target.value,
+                                      })
+                                    }
+                                  />
+                                  <div className="d-flex gap-2">
+                                    <Button
+                                      variant="primary"
+                                      size="sm"
+                                      onClick={() => handleFeedbackSave(req._id)}
+                                    >
+                                      Save Feedback
+                                    </Button>
+                                    <Button
+                                      variant="outline-danger"
+                                      size="sm"
+                                      onClick={() => handleFeedbackDelete(req._id)}
+                                    >
+                                      Clear
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                {/* Viability Assessment Section */}
+                                <div className="mt-4 border-top pt-3">
+                                  <h6 className="mb-3">Research Viability Assessment</h6>
+                                  <div className="d-flex gap-3 align-items-center">
+                                    <Button
+                                      variant="success"
+                                      size="sm"
+                                      onClick={() => {
+                                        const comments = prompt('Add any comments for viable assessment:');
+                                        if (comments !== null) {
+                                          handleViabilityAssessment(req._id, true, comments);
+                                        }
+                                      }}
+                                      disabled={viabilityStatus[req._id]?.isViable === true}
+                                    >
+                                      Mark as Viable for Funding
+                                    </Button>
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
+                                      onClick={() => {
+                                        const comments = prompt('Add reasons for non-viable assessment:');
+                                        if (comments !== null) {
+                                          handleViabilityAssessment(req._id, false, comments);
+                                        }
+                                      }}
+                                      disabled={viabilityStatus[req._id]?.isViable === false}
+                                    >
+                                      Mark as Not Viable
+                                    </Button>
+                                    {viabilityStatus[req._id] && (
+                                      <span className={`badge bg-${viabilityStatus[req._id].isViable ? 'success' : 'danger'}`}>
+                                        {viabilityStatus[req._id].isViable ? 'Viable' : 'Not Viable'}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {viabilityStatus[req._id]?.comments && (
+                                    <div className="mt-2 small text-muted">
+                                      Comments: {viabilityStatus[req._id].comments}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </td>
@@ -430,68 +608,79 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
         )}
 
         {activeTab === 'fundingRequest' && (
-          <Card className="shadow-lg border-0" style={{ borderRadius: 14 }}>
-            <Card.Header className="text-white" style={{ background: 'linear-gradient(135deg, #0d3b66, #00798c)' }}>
-              <h5 className="mb-0">Funding Feasibility</h5>
-            </Card.Header>
-            <Card.Body>
-              {requests.filter((r) => r.status === 'Finished').length === 0 && (
-                <p className="text-muted mb-0">No finished projects to validate.</p>
-              )}
-              {requests
-                .filter((r) => r.status === 'Finished')
-                .map((req, i) => (
-                  <div key={req._id} className="mb-3 p-3 border rounded bg-light" style={{ borderRadius: 12 }}>
-                    <div className="d-flex justify-content-between align-items-center mb-2">
-                      <h6 className="mb-0">{i + 1}. {req.projectTitle}</h6>
-                      <div className="text-muted small">Researcher: {req.researcher?.name}</div>
+          <>
+            <Card className="shadow-lg border-0" style={{ borderRadius: 14 }}>
+              <Card.Header className="text-white" style={{ background: 'linear-gradient(135deg, #0d3b66, #00798c)' }}>
+                <h5 className="mb-0">Funding Requests Pending Your Validation</h5>
+              </Card.Header>
+              <Card.Body>
+                <FundingRequestsList onValidate={handleSupervisorValidateFunding} />
+              </Card.Body>
+            </Card>
+
+            <Card className="shadow-lg border-0 mt-3" style={{ borderRadius: 14 }}>
+              <Card.Header className="text-white" style={{ background: 'linear-gradient(135deg, #0d3b66, #00798c)' }}>
+                <h5 className="mb-0">Funding Feasibility (Finished Projects)</h5>
+              </Card.Header>
+              <Card.Body>
+                {requests.filter((r) => r.status === 'Finished').length === 0 && (
+                  <p className="text-muted mb-0">No finished projects to validate.</p>
+                )}
+                {requests
+                  .filter((r) => r.status === 'Finished')
+                  .map((req, i) => (
+                    <div key={req._id} className="mb-3 p-3 border rounded bg-light" style={{ borderRadius: 12 }}>
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <h6 className="mb-0">{i + 1}. {req.projectTitle}</h6>
+                        <div className="text-muted small">Researcher: {req.researcher?.name}</div>
+                      </div>
+                      <div className="d-flex align-items-center gap-2 flex-wrap">
+                        <Button
+                          variant={
+                            fundingStatus[req._id]?.viable ? 'success' : 'outline-success'
+                          }
+                          size="sm"
+                          onClick={() =>
+                            handleFundingChange(req._id, true, 'Viable for funding')
+                          }
+                        >
+                          Viable
+                        </Button>
+                        <Button
+                          variant={
+                            fundingStatus[req._id]?.viable === false
+                              ? 'danger'
+                              : 'outline-danger'
+                          }
+                          size="sm"
+                          onClick={() =>
+                            handleFundingChange(req._id, false, 'Not viable')
+                          }
+                        >
+                          Not Viable
+                        </Button>
+                        <input
+                          type="text"
+                          className="form-control form-control-sm"
+                          placeholder="Reason (optional)"
+                          value={fundingStatus[req._id]?.reason || ''}
+                          onChange={(e) =>
+                            setFundingStatus((prev) => ({
+                              ...prev,
+                              [req._id]: {
+                                ...prev[req._id],
+                                reason: e.target.value,
+                              },
+                            }))
+                          }
+                          style={{ maxWidth: '300px' }}
+                        />
+                      </div>
                     </div>
-                    <div className="d-flex align-items-center gap-2 flex-wrap">
-                      <Button
-                        variant={
-                          fundingStatus[req._id]?.viable ? 'success' : 'outline-success'
-                        }
-                        size="sm"
-                        onClick={() =>
-                          handleFundingChange(req._id, true, 'Viable for funding')
-                        }
-                      >
-                        Viable
-                      </Button>
-                      <Button
-                        variant={
-                          fundingStatus[req._id]?.viable === false
-                            ? 'danger'
-                            : 'outline-danger'
-                        }
-                        size="sm"
-                        onClick={() =>
-                          handleFundingChange(req._id, false, 'Not viable')
-                        }
-                      >
-                        Not Viable
-                      </Button>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        placeholder="Reason (optional)"
-                        value={fundingStatus[req._id]?.reason || ''}
-                        onChange={(e) =>
-                          setFundingStatus((prev) => ({
-                            ...prev,
-                            [req._id]: {
-                              ...prev[req._id],
-                              reason: e.target.value,
-                            },
-                          }))
-                        }
-                        style={{ maxWidth: '300px' }}
-                      />
-                    </div>
-                  </div>
-                ))}
-            </Card.Body>
-          </Card>
+                  ))}
+              </Card.Body>
+            </Card>
+          </>
         )}
       </div>
     </div>
@@ -503,22 +692,45 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
       </Modal.Header>
       <Modal.Body>
         {selectedDocument && (
-          <>
-            <Document file={selectedDocument} onLoadSuccess={({ numPages }) => setNumPages(numPages)}>
-              <Page pageNumber={pageNumber} />
+          <div className="pdf-container">
+            <Document
+              file={selectedDocument}
+              onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+              onLoadError={(error) => {
+                console.error('Error loading PDF:', error);
+                alert('Error loading PDF document');
+              }}
+              loading={<div>Loading document...</div>}
+            >
+              <Page
+                pageNumber={pageNumber}
+                scale={1}
+                renderTextLayer={false}
+                renderAnnotationLayer={false}
+              />
             </Document>
-            <div className="d-flex justify-content-between mt-3">
-              <Button disabled={pageNumber <= 1} onClick={() => setPageNumber((p) => p - 1)}>
-                Previous
-              </Button>
-              <span>
-                Page {pageNumber} of {numPages || 0}
-              </span>
-              <Button disabled={!!numPages && pageNumber >= numPages} onClick={() => setPageNumber((p) => p + 1)}>
-                Next
-              </Button>
-            </div>
-          </>
+            {numPages > 0 && (
+              <div className="d-flex justify-content-between align-items-center mt-3">
+                <Button
+                  disabled={pageNumber <= 1}
+                  onClick={() => setPageNumber((p) => p - 1)}
+                  variant="outline-primary"
+                >
+                  Previous
+                </Button>
+                <span>
+                  Page {pageNumber} of {numPages}
+                </span>
+                <Button
+                  disabled={pageNumber >= numPages}
+                  onClick={() => setPageNumber((p) => p + 1)}
+                  variant="outline-primary"
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </div>
         )}
       </Modal.Body>
     </Modal>

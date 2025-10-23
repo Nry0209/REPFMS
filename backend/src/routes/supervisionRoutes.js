@@ -1,47 +1,11 @@
-    try {
-      const payload = { supervisionId: String(supervision._id) };
-      if (status === "Current") {
-        // Accepted by supervisor
-        await Notification.create([
-          {
-            forRole: "researcher",
-            forRoleRef: "Researcher",
-            forUser: supervision.researcher,
-            type: "supervision_accepted",
-            message: "Your supervision request has been accepted",
-            payload,
-          },
-          {
-            forRole: "admin",
-            forRoleRef: "Admin",
-            type: "supervision_accepted",
-            message: "A supervision request was accepted by supervisor",
-            payload,
-          },
-        ]);
-      } else if (status === "Finished") {
-        await Notification.create({
-          forRole: "researcher",
-          forRoleRef: "Researcher",
-          forUser: supervision.researcher,
-          type: "supervision_finished",
-          message: "Your supervision has been marked as finished",
-          payload,
-        });
-      } else if (status === "Pending") {
-        // No-op
-      }
-    } catch (e) {
-      console.error("Supervision update notifications error:", e);
-    }
-
-
-
 import express from "express";
 import Supervision from "../models/Supervision.js";
 import Supervisor from "../models/Supervisor.js";
 import Researcher from "../models/Researcher.js";
 import Notification from "../models/Notification.js";
+import Research from "../models/Research.js";
+import path from "path";
+import fs from "fs";
 import jwt from "jsonwebtoken";
 
 const router = express.Router();
@@ -55,7 +19,8 @@ const verifyToken = (req, res, next) => {
   const token = authHeader.replace("Bearer ", "");
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.id || decoded.supervisorId;
+    // Accept multiple JWT shapes: { id }, { supervisorId }, or { userId }
+    req.userId = decoded.id || decoded.supervisorId || decoded.userId;
     req.role = decoded.role;
     next();
   } catch (err) {
@@ -86,6 +51,51 @@ router.get("/profile", verifyToken, async (req, res) => {
   }
 });
 
+// ------------------- Research / Supervision document viewer -------------------
+// GET /api/supervisions/research-document/:id
+router.get("/research-document/:id", verifyToken, async (req, res) => {
+  try {
+    const id = req.params.id;
+    let supervision = null;
+    try {
+      supervision = await Supervision.findById(id).lean();
+    } catch (e) { /* ignore invalid ObjectId */ }
+
+    let filename;
+    if (supervision && (supervision.researchDocument || supervision.documentPath || supervision.fileName)) {
+      filename = supervision.researchDocument || supervision.documentPath || supervision.fileName;
+    } else {
+      const research = await Research.findById(id).lean();
+      if (research && (research.paperFile || research.fileName || research.document)) {
+        filename = research.paperFile || research.fileName || research.document;
+      }
+    }
+
+    if (!filename) {
+      return res.status(404).json({ success: false, message: "Document not found for provided id" });
+    }
+
+    const uploadsDir = path.resolve(process.cwd(), "uploads", "research");
+    const filePath = path.join(uploadsDir, filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: "File missing on server" });
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    const isPdf = ext === ".pdf";
+    const download = req.query.download === "1" || req.query.download === "true";
+    const disposition = (download || !isPdf) ? "attachment" : "inline";
+    res.setHeader("Content-Disposition", `${disposition}; filename="${path.basename(filePath)}"`);
+    if (isPdf && disposition === "inline") res.setHeader("Content-Type", "application/pdf");
+
+    return res.sendFile(filePath);
+  } catch (err) {
+    console.error("GET /research-document error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 // ------------------- Researcher sends supervision request -------------------
 router.post("/request", verifyToken, async (req, res) => {
   const { supervisorId, projectTitle, durationMonths } = req.body;
@@ -110,6 +120,8 @@ router.post("/request", verifyToken, async (req, res) => {
       return res.status(400).json({
         message: "You already have a pending or current supervision request.",
       });
+
+  
 
     // Create a new supervision
     const supervision = new Supervision({
@@ -190,6 +202,17 @@ router.post("/research/:id/request-supervision", verifyToken, async (req, res) =
 
     await supervision.save();
     console.log("Created supervision:", supervision);
+
+    // Link this supervision back to the research so supervisors can resolve the document
+    try {
+      await Research.findByIdAndUpdate(
+        researchId,
+        { supervisionRef: supervision._id, supervisor: supervisorId },
+        { new: true }
+      );
+    } catch (e) {
+      console.error("Failed to link supervision to research:", e);
+    }
 
     return res.status(201).json({
       success: true,
@@ -346,6 +369,71 @@ router.put("/update/:id", verifyToken, async (req, res) => {
   } catch (err) {
     console.error("PUT /supervision/update error:", err);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ------------------- Supervisor assesses research viability -------------------
+router.post("/:id/assess-viability", verifyToken, async (req, res) => {
+  try {
+    if (String(req.role).toLowerCase() !== "supervisor") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const { id } = req.params;
+    const { isViable, comments, assessmentDate } = req.body || {};
+
+    const supervision = await Supervision.findById(id);
+    if (!supervision) {
+      return res.status(404).json({ success: false, message: "Supervision not found" });
+    }
+
+    if (String(supervision.supervisor) !== String(req.userId)) {
+      return res.status(403).json({ success: false, message: "Not your supervision" });
+    }
+
+    supervision.viabilityStatus = {
+      isViable: Boolean(isViable),
+      comments: comments || "",
+      assessedBy: req.userId,
+      assessedAt: assessmentDate ? new Date(assessmentDate) : new Date(),
+    };
+
+    supervision.feasibility = Boolean(isViable) ? "Feasible" : "Not Feasible";
+    supervision.status = "Finished";
+
+    await supervision.save();
+
+    try {
+      const payload = { supervisionId: String(supervision._id), isViable: Boolean(isViable) };
+      await Notification.create([
+        {
+          forRole: "researcher",
+          forRoleRef: "Researcher",
+          forUser: supervision.researcher,
+          type: Boolean(isViable) ? "viability_assessed_viable" : "viability_assessed_not_viable",
+          message: Boolean(isViable)
+            ? "Your research has been assessed as viable for funding"
+            : "Your research has been assessed as not viable for funding",
+          payload,
+        },
+        {
+          forRole: "admin",
+          forRoleRef: "Admin",
+          type: Boolean(isViable) ? "viability_assessed_viable" : "viability_assessed_not_viable",
+          message: Boolean(isViable)
+            ? "A research was assessed as viable by supervisor"
+            : "A research was assessed as not viable by supervisor",
+          payload,
+        },
+      ]);
+    } catch (e) {
+      console.error("Viability notification error:", e);
+    }
+
+    return res.json({ success: true, message: "Viability assessment saved", supervision });
+  } catch (err) {
+    console.error("Viability assessment error:", err);
+    return res.status(500).json({ success: false, message: "Failed to save assessment" });
   }
 });
 
