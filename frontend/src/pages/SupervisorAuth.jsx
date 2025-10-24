@@ -402,7 +402,7 @@ const SupervisorAuth = ({ setAuth }) => {
                   <div className="d-inline-flex align-items-center justify-content-center rounded-circle" style={{ width: 56, height: 56, background: "linear-gradient(135deg, #0d3b66, #00798c)" }}>
                     <Users size={28} color="#fff" />
                   </div>
-                  <h3 className="fw-bold mt-3 mb-1" style={{ color: "#0d3b66" }}>{isLogin ? "Welcome Back" : "Create Supervisor Account"}</h3>
+                  <h3 className="fw-bold mt-3 mb-1" style={{ color: "#0d3b66" }}>{isLogin ? "Welcome Supervisor" : "Create Supervisor Account"}</h3>
                   <div className="text-muted">{isLogin ? "Sign in to your account" : "Fill in details to register"}</div>
                 </div>
                 <Form onSubmit={handleSubmit}>

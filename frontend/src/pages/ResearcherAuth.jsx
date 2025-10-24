@@ -211,7 +211,7 @@ const ResearcherAuth = ({ setAuth }) => {
                 <div className="d-inline-flex align-items-center justify-content-center rounded-circle mb-2" style={{ width: 56, height: 56, background: "linear-gradient(135deg, #00798c, #0d3b66)" }}>
                   <User size={28} color="#fff" />
                 </div>
-                <h3 className="fw-bold" style={{ color: "#0d3b66" }}>{isLogin ? "Welcome Back" : "Create Researcher Account"}</h3>
+                <h3 className="fw-bold" style={{ color: "#0d3b66" }}>{isLogin ? "Welcome Researcher" : "Create Researcher Account"}</h3>
                 <div className="text-muted">{isLogin ? "Sign in to your account" : "Fill in details to register"}</div>
               </div>
 
