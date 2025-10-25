@@ -552,48 +552,6 @@ const SupervisorDashboard = ({ auth, setAuth }) => {
                                   </div>
                                 </div>
 
-                                {/* Viability Assessment Section */}
-                                <div className="mt-4 border-top pt-3">
-                                  <h6 className="mb-3">Research Viability Assessment</h6>
-                                  <div className="d-flex gap-3 align-items-center">
-                                    <Button
-                                      variant="success"
-                                      size="sm"
-                                      onClick={() => {
-                                        const comments = prompt('Add any comments for viable assessment:');
-                                        if (comments !== null) {
-                                          handleViabilityAssessment(req._id, true, comments);
-                                        }
-                                      }}
-                                      disabled={viabilityStatus[req._id]?.isViable === true}
-                                    >
-                                      Mark as Viable for Funding
-                                    </Button>
-                                    <Button
-                                      variant="danger"
-                                      size="sm"
-                                      onClick={() => {
-                                        const comments = prompt('Add reasons for non-viable assessment:');
-                                        if (comments !== null) {
-                                          handleViabilityAssessment(req._id, false, comments);
-                                        }
-                                      }}
-                                      disabled={viabilityStatus[req._id]?.isViable === false}
-                                    >
-                                      Mark as Not Viable
-                                    </Button>
-                                    {viabilityStatus[req._id] && (
-                                      <span className={`badge bg-${viabilityStatus[req._id].isViable ? 'success' : 'danger'}`}>
-                                        {viabilityStatus[req._id].isViable ? 'Viable' : 'Not Viable'}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {viabilityStatus[req._id]?.comments && (
-                                    <div className="mt-2 small text-muted">
-                                      Comments: {viabilityStatus[req._id].comments}
-                                    </div>
-                                  )}
-                                </div>
                               </div>
                             </td>
                           </tr>

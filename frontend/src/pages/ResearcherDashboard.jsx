@@ -888,68 +888,7 @@ const ResearcherDashboard = () => {
               </Row>
             )}
 
-            {/* Completed Projects */}
-            <Row>
-              <Col>
-                <Card className="custom-card shadow border-0">
-                  <Card.Header className="custom-card-header">
-                    <h5 className="mb-0">Completed Projects</h5>
-                  </Card.Header>
-                  <Card.Body className="p-0">
-                    {(() => {
-                      const finished = (supervisions || []).filter((s) => s.status === 'Finished');
-                      if (!finished.length) return <p className="text-muted p-3 mb-0">No completed projects.</p>;
-                      return (
-                        <div className="table-responsive">
-                          <table className="table table-hover mb-0 align-middle">
-                            <thead>
-                              <tr>
-                                <th>Title</th>
-                                <th>Supervisor</th>
-                                <th>Feasibility</th>
-                                <th>Viability</th>
-                                <th>Completed</th>
-                                <th>Action</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {finished.map((s) => (
-                                <tr key={s._id}>
-                                  <td>{s.projectTitle}</td>
-                                  <td>{s.supervisor?.fullName || s.supervisor?.name || '-'}</td>
-                                  <td>{s.feasibility || '-'}</td>
-                                  <td>{typeof s.viabilityStatus?.isViable === 'boolean' ? (s.viabilityStatus.isViable ? 'Viable' : 'Not Viable') : '-'}</td>
-                                  <td>{s.updatedAt ? new Date(s.updatedAt).toLocaleDateString() : '-'}</td>
-                                  <td>
-                                    <div className="d-flex gap-2">
-                                      <Button size="sm" variant="outline-primary" onClick={() => openReadOnlyDoc(s._id)}>Read</Button>
-                                      <Button size="sm" variant="outline-secondary" onClick={() => openFeedbacks(s)}>Feedback</Button>
-                                      {((s.feasibility === 'Feasible') || (s.viabilityStatus?.isViable === true)) && (
-                                        <Button
-                                          size="sm"
-                                          style={{ backgroundColor: '#00798c', borderColor: '#00798c' }}
-                                          onClick={() => {
-                                            const r = findResearchByTitle(s.projectTitle);
-                                            if (!r) return alert('Related research not found to submit funding');
-                                            handleFundingSubmit(r);
-                                          }}
-                                        >
-                                          Request Funding
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      );
-                    })()}
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
+           
           </Container>
         )}
 
@@ -1323,3 +1262,68 @@ const ResearcherDashboard = () => {
 };
 
 export default ResearcherDashboard;
+
+
+
+//  Completed Projects
+//             <Row>
+//               <Col>
+//                 <Card className="custom-card shadow border-0">
+//                   <Card.Header className="custom-card-header">
+//                     <h5 className="mb-0">Completed Projects</h5>
+//                   </Card.Header>
+//                   <Card.Body className="p-0">
+//                     {(() => {
+//                       const finished = (supervisions || []).filter((s) => s.status === 'Finished');
+//                       if (!finished.length) return <p className="text-muted p-3 mb-0">No completed projects.</p>;
+//                       return (
+//                         <div className="table-responsive">
+//                           <table className="table table-hover mb-0 align-middle">
+//                             <thead>
+//                               <tr>
+//                                 <th>Title</th>
+//                                 <th>Supervisor</th>
+//                                 <th>Feasibility</th>
+//                                 <th>Viability</th>
+//                                 <th>Completed</th>
+//                                 <th>Action</th>
+//                               </tr>
+//                             </thead>
+//                             <tbody>
+//                               {finished.map((s) => (
+//                                 <tr key={s._id}>
+//                                   <td>{s.projectTitle}</td>
+//                                   <td>{s.supervisor?.fullName || s.supervisor?.name || '-'}</td>
+//                                   <td>{s.feasibility || '-'}</td>
+//                                   <td>{typeof s.viabilityStatus?.isViable === 'boolean' ? (s.viabilityStatus.isViable ? 'Viable' : 'Not Viable') : '-'}</td>
+//                                   <td>{s.updatedAt ? new Date(s.updatedAt).toLocaleDateString() : '-'}</td>
+//                                   <td>
+//                                     <div className="d-flex gap-2">
+//                                       <Button size="sm" variant="outline-primary" onClick={() => openReadOnlyDoc(s._id)}>Read</Button>
+//                                       <Button size="sm" variant="outline-secondary" onClick={() => openFeedbacks(s)}>Feedback</Button>
+//                                       {((s.feasibility === 'Feasible') || (s.viabilityStatus?.isViable === true)) && (
+//                                         <Button
+//                                           size="sm"
+//                                           style={{ backgroundColor: '#00798c', borderColor: '#00798c' }}
+//                                           onClick={() => {
+//                                             const r = findResearchByTitle(s.projectTitle);
+//                                             if (!r) return alert('Related research not found to submit funding');
+//                                             handleFundingSubmit(r);
+//                                           }}
+//                                         >
+//                                           Request Funding
+//                                         </Button>
+//                                       )}
+//                                     </div>
+//                                   </td>
+//                                 </tr>
+//                               ))}
+//                             </tbody>
+//                           </table>
+//                         </div>
+//                       );
+//                     })()}
+//                   </Card.Body>
+//                 </Card>
+//               </Col>
+//             </Row>
