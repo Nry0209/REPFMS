@@ -1,6 +1,6 @@
 # REPFMS
 
-**REPFMS** (Research Expert Pooling and Managemnt System) is a full-stack application designed to facilitate ,expert(supervisor) pooling, research funding requests, supervision, and administration. It consists of a Node.js/Express backend with MongoDB and a React frontend using Tailwind CSS and Redux.
+**REPFMS** (Research Expert Pooling and Management System) is a full-stack application designed to facilitate ,expert(supervisor) pooling, research funding requests, supervision, and administration. It consists of a Node.js/Express backend with MongoDB and a React frontend using Tailwind CSS and Redux.
 
 ---
 ## 🗂️ Project Structure
